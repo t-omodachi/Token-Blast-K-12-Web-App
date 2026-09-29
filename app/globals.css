@@ -122,3 +122,29 @@ body {
     transform: translateX(-50%) rotateX(35deg) scale(0.75);
   }
 }
+
+/* Floating asteroid animation */
+
+@keyframes asteroid-float {
+  0% {
+    transform: translateY(0px) rotate(-4deg);
+  }
+
+  50% {
+    transform: translateY(-12px) rotate(4deg);
+  }
+
+  100% {
+    transform: translateY(0px) rotate(-4deg);
+  }
+}
+
+.asteroid-float {
+  animation: asteroid-float 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asteroid-float {
+    animation: none;
+  }
+}
