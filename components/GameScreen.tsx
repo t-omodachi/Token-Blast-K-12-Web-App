@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -13,6 +14,8 @@ import {
   getModelName,
   type LLM,
 } from "@/lib/gameLevels";
+
+import { audioManager } from "@/lib/audioManager";
 
 type GameScreenProps = {
   selectedLLM: LLM;
@@ -84,8 +87,8 @@ export default function GameScreen({
 
   const scoreRef = useRef(0);
 
-  const levels =
-    getLevelsForModel(selectedLLM);
+  const [levels, setLevels] = useState(() => getLevelsForModel(selectedLLM));
+
 
   const [currentLevelIndex, setCurrentLevelIndex] =
     useState(0);
@@ -119,6 +122,10 @@ export default function GameScreen({
 
   const [round, setRound] =
     useState(0);
+
+  useEffect(() => {
+    setLevels(getLevelsForModel(selectedLLM));
+  }, [selectedLLM, round]);
 
   const level =
     levels[currentLevelIndex];
@@ -172,9 +179,7 @@ export default function GameScreen({
     if (!ctx) return;
 
     const levelData =
-      getLevelsForModel(
-        selectedLLM
-      )[currentLevelIndex];
+      levels[currentLevelIndex];
 
     let width = 0;
     let height = 0;
@@ -252,35 +257,37 @@ export default function GameScreen({
               index / columns
             );
 
-          return {
-            id: index,
+            const speedMult = 1 + ((levelData.difficulty || 1) - 1) * 0.4;
 
-            token,
+            return {
+              id: index,
 
-            x:
-              width *
-              (0.2 +
-                column * 0.3),
+              token,
 
-            y:
-              height *
-              (0.2 +
-                row * 0.25),
+              x:
+                width *
+                (0.2 +
+                  column * 0.3),
 
-            vx:
-              index % 2 === 0
-                ? 45
-                : -40,
+              y:
+                height *
+                (0.2 +
+                  row * 0.25),
 
-            vy:
-              index % 3 === 0
-                ? 35
-                : -30,
+              vx:
+                (index % 2 === 0
+                  ? 45
+                  : -40) * speedMult,
 
-            radius,
+              vy:
+                (index % 3 === 0
+                  ? 35
+                  : -30) * speedMult,
 
-            health:
-              ASTEROID_HEALTH,
+              radius,
+
+              health:
+                ASTEROID_HEALTH + Math.floor((levelData.difficulty || 1) / 2),
 
             flash: 0,
           };
@@ -422,6 +429,8 @@ export default function GameScreen({
 
         radius: 5,
       });
+
+      audioManager.play("shoot");
     }
 
     function finishLevel(
@@ -478,16 +487,11 @@ export default function GameScreen({
     function asteroidDestroyed(
       asteroid: Asteroid
     ) {
-      const expected =
-        levelData.correctTokens[
-          selected.length
-        ];
+      const requiredCount = levelData.correctTokens.filter(t => t === asteroid.token).length;
+      const collectedCount = selected.filter(t => t === asteroid.token).length;
 
       // Correct token
-      if (
-        asteroid.token ===
-        expected
-      ) {
+      if (requiredCount > collectedCount) {
         selected.push(
           asteroid.token
         );
@@ -516,10 +520,13 @@ export default function GameScreen({
             "Word complete!"
           );
 
+          audioManager.play("levelComplete");
           finishLevel(true);
+        } else {
+          audioManager.play("correct");
         }
 
-        return;
+        return "correct";
       }
 
       // Wrong token
@@ -533,10 +540,6 @@ export default function GameScreen({
         livesRemaining
       );
 
-      selected = [];
-
-      setSelectedTokens([]);
-
       scoreRef.current =
         Math.max(
           0,
@@ -549,22 +552,19 @@ export default function GameScreen({
       );
 
       setMessage(
-        `That token was not next in the sequence. Lives remaining: ${livesRemaining}`
+        `Incorrect token! Lives remaining: ${livesRemaining}`
       );
 
       if (
         livesRemaining === 0
       ) {
+        audioManager.play("gameOver");
         finishLevel(false);
-
-        return;
+      } else {
+        audioManager.play("wrong");
       }
 
-      // Reset asteroid field
-      asteroids =
-        makeAsteroids();
-
-      bullets = [];
+      return "distractor";
     }
 
     function drawBackground() {
@@ -1127,13 +1127,13 @@ export default function GameScreen({
                 asteroid.health <=
                 0
               ) {
+                const outcome = asteroidDestroyed(
+                  asteroid
+                );
+
                 asteroids.splice(
                   j,
                   1
-                );
-
-                asteroidDestroyed(
-                  asteroid
                 );
               }
 
@@ -1250,6 +1250,7 @@ export default function GameScreen({
     currentLevelIndex,
     round,
     selectedLLM,
+    levels,
   ]);
 
   return (
