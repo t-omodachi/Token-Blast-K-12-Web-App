@@ -1,43 +1,80 @@
-
 "use client";
 
 import { useState } from "react";
 
 import TitleScreen from "@/components/TitleScreen";
-import InstructionsScreen from "@/components/InstructionsScreen";
+import ModelSelectScreen from "@/components/ModelSelectScreen";
+import DemoScreen from "@/components/DemoScreen";
 import GameScreen from "@/components/GameScreen";
 
-type Screen = "title" | "instructions" | "game";
+type Screen =
+  | "title"
+  | "model-select"
+  | "demo"
+  | "game"
+  | "results"
+  | "leaderboard";
+
+type LLM =
+  | "chatgpt"
+  | "gemini"
+  | "claude";
 
 export default function Home() {
+  const [screen, setScreen] =
+    useState<Screen>("title");
 
-  const [screen, setScreen] = useState<Screen>("title");
+  const [selectedLLM, setSelectedLLM] =
+    useState<LLM | null>(null);
+
+  function chooseLLM(model: LLM) {
+    setSelectedLLM(model);
+    setScreen("demo");
+  }
 
   return (
     <>
-
-      {/* TITLE SCREEN */}
+      {/* TITLE */}
       {screen === "title" && (
         <TitleScreen
-          onPlay={() => setScreen("instructions")}
+          onPlay={() =>
+            setScreen("model-select")
+          }
         />
       )}
 
-      {/* INSTRUCTIONS SCREEN */}
-      {screen === "instructions" && (
-        <InstructionsScreen
-          onBack={() => setScreen("title")}
-          onStart={() => setScreen("game")}
+      {/* MODEL SELECTION */}
+      {screen === "model-select" && (
+        <ModelSelectScreen
+          onSelect={chooseLLM}
+          onBack={() =>
+            setScreen("title")
+          }
         />
       )}
 
-      {/* GAME SCREEN */}
+      {/* DEMO */}
+      {screen === "demo" &&
+        selectedLLM && (
+          <DemoScreen
+            selectedLLM={selectedLLM}
+            onComplete={() =>
+              setScreen("game")
+            }
+            onBack={() =>
+              setScreen("model-select")
+            }
+          />
+        )}
+
+      {/* REAL GAME */}
       {screen === "game" && (
         <GameScreen
-          onBack={() => setScreen("instructions")}
+          onBack={() =>
+            setScreen("model-select")
+          }
         />
       )}
-
     </>
   );
 }
