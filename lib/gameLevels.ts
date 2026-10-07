@@ -10,48 +10,44 @@ export type LevelData = {
   distractors: string[];
   explanation: string;
   verified: boolean;
+  difficulty: number;
 };
 
-const developmentLevels: LevelData[] = [
-  {
-    id: 1,
-    word: "PLAYING",
-    correctTokens: ["play", "ing"],
-    distractors: ["pla", "ying", "pl", "in"],
-    explanation:
-      "This is temporary development data. The final version will explain why the selected model tokenizes this word into these specific pieces.",
-    verified: false,
-  },
-
-  {
-    id: 2,
-    word: "TEACHER",
-    correctTokens: ["teach", "er"],
-    distractors: ["tea", "cher", "te", "acher"],
-    explanation:
-      "This is temporary development data. The final explanation will use verified tokenizer information for the selected model.",
-    verified: false,
-  },
-
-  {
-    id: 3,
-    word: "UNHAPPY",
-    correctTokens: ["un", "happy"],
-    distractors: ["unh", "appy", "hap", "py"],
-    explanation:
-      "This is temporary development data. The final explanation will describe why the selected tokenizer divides this word into these pieces.",
-    verified: false,
-  },
-];
+import tokenData from "../data/tokens.json";
 
 export function getLevelsForModel(
   model: LLM
 ): LevelData[] {
-  return developmentLevels.map(
-    (level) => ({
-      ...level,
-    })
-  );
+  // Filter the JSON database for the selected model
+  const modelTokens = tokenData.filter((t) => t.model === model);
+
+  // Group by difficulty
+  const diff1 = modelTokens.filter((t) => t.difficulty === 1);
+  const diff2 = modelTokens.filter((t) => t.difficulty === 2);
+  const diff3 = modelTokens.filter((t) => t.difficulty === 3);
+
+  // Helper to pick N random items from an array
+  const pickRandom = (arr: typeof diff1, n: number) => {
+    return [...arr].sort(() => 0.5 - Math.random()).slice(0, Math.min(n, arr.length));
+  };
+
+  // Build the 5-round campaign: Two Level 1s, Two Level 2s, One Level 3
+  const selectedLevels = [
+    ...pickRandom(diff1, 2),
+    ...pickRandom(diff2, 2),
+    ...pickRandom(diff3, 1),
+  ];
+
+  // Map them into the expected LevelData structure
+  return selectedLevels.map((level, index) => ({
+    id: index + 1,
+    word: level.word,
+    correctTokens: level.correctTokens,
+    distractors: level.distractors,
+    explanation: level.explanation,
+    verified: true,
+    difficulty: level.difficulty,
+  }));
 }
 
 export function getModelName(
