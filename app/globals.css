@@ -148,3 +148,363 @@ body {
     animation: none;
   }
 }
+
+/* Model select planets */
+
+.planet-system {
+  /* Scales with both width and height so short laptop screens fit */
+  --planet-size: clamp(6.5rem, min(15vw, 21vh), 11rem);
+
+  position: relative;
+
+  width: calc(var(--planet-size) * 1.8);
+  height: calc(var(--planet-size) * 1.5);
+
+  transition: transform 0.4s ease;
+}
+
+.group:hover .planet-system,
+.group:focus-visible .planet-system {
+  transform: scale(1.08);
+}
+
+/* Every layer is centered on the system */
+.planet-body,
+.planet-ring,
+.planet-orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+}
+
+.planet-body {
+  width: var(--planet-size);
+  height: var(--planet-size);
+  margin: calc(var(--planet-size) / -2) 0 0 calc(var(--planet-size) / -2);
+
+  border-radius: 50%;
+  overflow: hidden;
+
+  /* Surface is two planets wide and scrolls sideways to look like it spins */
+  background-size: calc(var(--planet-size) * 2) 100%;
+  background-repeat: repeat-x;
+  animation: planet-spin 40s linear infinite;
+
+  box-shadow:
+    0 0 2rem var(--glow),
+    0 0 4.5rem var(--glow-soft);
+
+  transition: box-shadow 0.4s ease;
+}
+
+.group:hover .planet-body,
+.group:focus-visible .planet-body {
+  box-shadow:
+    0 0 2.5rem var(--glow),
+    0 0 6rem var(--glow);
+}
+
+/* Sunlight highlight + night-side shadow */
+.planet-body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.35), transparent 40%),
+    radial-gradient(circle at 68% 72%, transparent 35%, rgba(2, 6, 23, 0.8) 78%);
+}
+
+@keyframes planet-spin {
+  to {
+    background-position-x: calc(var(--planet-size) * -2);
+  }
+}
+
+/* ChatGPT: green gas giant with storm bands */
+.planet-chatgpt {
+  --glow: rgba(52, 211, 153, 0.45);
+  --glow-soft: rgba(52, 211, 153, 0.15);
+}
+
+.planet-chatgpt .planet-body {
+  background-image:
+    radial-gradient(ellipse 9% 9% at 30% 62%, #a7f3d0, #34d399 55%, transparent 75%),
+    radial-gradient(ellipse 6% 5% at 78% 30%, #d1fae5, transparent 75%),
+    linear-gradient(
+      180deg,
+      #064e3b 0%,
+      #059669 12%,
+      #6ee7b7 18%,
+      #047857 26%,
+      #10b981 38%,
+      #a7f3d0 44%,
+      #059669 52%,
+      #065f46 64%,
+      #34d399 72%,
+      #047857 84%,
+      #022c22 100%
+    );
+}
+
+/* Gemini: blue ocean world with a ring */
+.planet-gemini {
+  --glow: rgba(96, 165, 250, 0.45);
+  --glow-soft: rgba(96, 165, 250, 0.15);
+}
+
+.planet-gemini .planet-body {
+  background-image:
+    radial-gradient(ellipse 14% 10% at 22% 30%, rgba(219, 234, 254, 0.75), transparent 70%),
+    radial-gradient(ellipse 18% 8% at 60% 68%, rgba(191, 219, 254, 0.6), transparent 70%),
+    radial-gradient(ellipse 10% 7% at 85% 40%, rgba(219, 234, 254, 0.7), transparent 70%),
+    radial-gradient(ellipse 12% 14% at 45% 45%, #22d3ee, transparent 70%),
+    linear-gradient(180deg, #1e3a8a, #2563eb 45%, #1d4ed8 70%, #172554);
+}
+
+.planet-ring {
+  width: calc(var(--planet-size) * 1.75);
+  height: calc(var(--planet-size) * 0.42);
+
+  border-radius: 50%;
+  border: calc(var(--planet-size) * 0.05) solid rgba(147, 197, 253, 0.6);
+  box-shadow: 0 0 0.75rem rgba(96, 165, 250, 0.5);
+
+  transform: translate(-50%, -50%) rotate(-16deg);
+}
+
+/* Top half of the ring goes behind the planet, bottom half in front */
+.planet-ring-back {
+  clip-path: inset(0 0 50% 0);
+}
+
+.planet-ring-front {
+  clip-path: inset(50% 0 0 0);
+}
+
+/* Claude: orange rocky world with craters */
+.planet-claude {
+  --glow: rgba(251, 146, 60, 0.45);
+  --glow-soft: rgba(251, 146, 60, 0.15);
+}
+
+.planet-claude .planet-body {
+  background-image:
+    radial-gradient(ellipse 6% 12% at 20% 35%, #9a3412 55%, #fdba74 65%, transparent 72%),
+    radial-gradient(ellipse 3.5% 7% at 38% 70%, #9a3412 55%, #fdba74 65%, transparent 72%),
+    radial-gradient(ellipse 4.5% 9% at 62% 25%, #9a3412 55%, #fdba74 65%, transparent 72%),
+    radial-gradient(ellipse 2.5% 5% at 75% 60%, #9a3412 55%, #fdba74 65%, transparent 72%),
+    radial-gradient(ellipse 5% 10% at 88% 78%, #9a3412 55%, #fdba74 65%, transparent 72%),
+    radial-gradient(ellipse 22% 20% at 50% 85%, rgba(124, 45, 18, 0.6), transparent 70%),
+    linear-gradient(160deg, #fb923c, #ea580c 45%, #c2410c 75%, #7c2d12);
+}
+
+/* Orbiting moon (path drawn as a faint dashed circle) */
+.planet-orbit {
+  width: calc(var(--planet-size) * 1.45);
+  height: calc(var(--planet-size) * 1.45);
+  margin: calc(var(--planet-size) * -0.725) 0 0 calc(var(--planet-size) * -0.725);
+
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+
+  animation: planet-orbit 16s linear infinite;
+}
+
+.planet-claude .planet-orbit {
+  animation-duration: 11s;
+  animation-direction: reverse;
+}
+
+.planet-moon {
+  position: absolute;
+  top: 0;
+  left: 50%;
+
+  width: calc(var(--planet-size) * 0.14);
+  height: calc(var(--planet-size) * 0.14);
+
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+
+  background: radial-gradient(circle at 35% 35%, #f8fafc, #94a3b8 55%, #334155);
+  box-shadow: 0 0 0.6rem rgba(255, 255, 255, 0.35);
+}
+
+@keyframes planet-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planet-body,
+  .planet-orbit {
+    animation: none;
+  }
+
+  .planet-system {
+    transition: none;
+  }
+}
+
+/* HUD hearts when a life is lost (replayed via React key) */
+
+@keyframes hud-heart-hit {
+  0% {
+    transform: scale(1);
+  }
+
+  15% {
+    transform: scale(1.5) translateX(-4px);
+    text-shadow: 0 0 12px rgba(248, 113, 113, 0.9);
+  }
+
+  30% {
+    transform: scale(1.3) translateX(4px);
+  }
+
+  45% {
+    transform: scale(1.2) translateX(-3px);
+  }
+
+  60% {
+    transform: scale(1.1) translateX(2px);
+  }
+
+  100% {
+    transform: scale(1);
+    text-shadow: none;
+  }
+}
+
+.hud-heart-hit {
+  display: inline-block;
+  animation: hud-heart-hit 0.6s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-heart-hit {
+    animation: none;
+  }
+}
+
+/* Instructions: Star Wars-style mission briefing crawl */
+
+.briefing-container {
+  position: absolute;
+  inset: 0 0 7rem 0;
+
+  overflow: hidden;
+
+  perspective: 400px;
+  perspective-origin: 50% 0%;
+
+  /* Text fades out as it recedes toward the top */
+  mask-image: linear-gradient(to bottom, transparent 0%, black 40%);
+}
+
+/* Tilted surface, hinged at the bottom of the screen */
+.briefing-plane {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+
+  width: min(90%, 44rem);
+  height: 100%;
+
+  transform: translateX(-50%) rotateX(25deg);
+  transform-origin: 50% 100%;
+}
+
+/* Text slides up the surface from just below the screen */
+.briefing-crawl {
+  position: absolute;
+  top: 100%;
+  width: 100%;
+
+  animation: briefing-crawl 80s linear forwards;
+
+  font-family: "Arial Black", Arial, sans-serif;
+  font-size: clamp(1.15rem, 2.6vw, 1.9rem);
+  font-weight: 800;
+  line-height: 1.45;
+  text-align: justify;
+
+  color: #ffe81f;
+}
+
+.briefing-crawl p {
+  margin-bottom: 1.4em;
+}
+
+.briefing-episode {
+  text-align: center;
+  letter-spacing: 0.2em;
+}
+
+.briefing-title,
+.briefing-heading,
+.briefing-signoff {
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+
+.briefing-title {
+  margin-bottom: 1em;
+  font-size: 1.8em;
+}
+
+.briefing-heading {
+  margin: 1.6em 0 0.6em;
+  font-size: 1.3em;
+}
+
+.briefing-scoring {
+  margin-bottom: 1.4em;
+  text-align: left;
+}
+
+.briefing-scoring li {
+  display: grid;
+  grid-template-columns: 4.2em 1fr;
+  gap: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.briefing-points {
+  text-align: right;
+  color: #ffffff;
+}
+
+@keyframes briefing-crawl {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(calc(-100% - 100vh));
+  }
+}
+
+/* Reduced motion: flat, scrollable text instead of a crawl */
+@media (prefers-reduced-motion: reduce) {
+  .briefing-container {
+    overflow-y: auto;
+    perspective: none;
+    mask-image: none;
+  }
+
+  .briefing-plane {
+    position: static;
+    margin: 3rem auto 0;
+    height: auto;
+    transform: none;
+  }
+
+  .briefing-crawl {
+    position: static;
+    animation: none;
+  }
+}

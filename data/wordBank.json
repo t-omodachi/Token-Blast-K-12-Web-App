@@ -1,0 +1,56 @@
+[
+  {
+    "word": "playing",
+    "difficulty": 1
+  },
+  {
+    "word": "cats",
+    "difficulty": 1
+  },
+  {
+    "word": "jumped",
+    "difficulty": 1
+  },
+  {
+    "word": "dogs",
+    "difficulty": 1
+  },
+
+  {
+    "word": "unhappy",
+    "difficulty": 2
+  },
+  {
+    "word": "rebuild",
+    "difficulty": 2
+  },
+  {
+    "word": "teacher",
+    "difficulty": 2
+  },
+  {
+    "word": "fastest",
+    "difficulty": 2
+  },
+  {
+    "word": "preview",
+    "difficulty": 2
+  },
+  {
+    "word": "runner",
+    "difficulty": 2
+  },
+
+  {
+    "word": "unbelievable",
+    "difficulty": 3
+  },
+  {
+    "word": "misunderstand",
+    "difficulty": 3
+  },
+  {
+    "word": "interstellar",
+    "difficulty": 3
+  }
+]

@@ -1,24 +1,14 @@
 type FeedbackModalProps = {
   success: boolean;
-
   modelName: string;
-
   word: string;
-
   correctTokens: string[];
-
   selectedTokens: string[];
-
   explanation: string;
-
   score: number;
-
   verified: boolean;
-
   levelNumber: number;
-
   totalLevels: number;
-
   onContinue: () => void;
 };
 
@@ -39,16 +29,18 @@ export default function FeedbackModal({
     levelNumber === totalLevels;
 
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/75 p-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-4">
 
-      <div className="w-full max-w-xl rounded-2xl border-2 border-cyan-400 bg-slate-950 p-7 text-center shadow-[0_0_50px_rgba(34,211,238,.25)]">
+      <div className="w-full max-w-xl rounded-2xl border-2 border-cyan-400 bg-slate-950 p-5 text-center shadow-[0_0_50px_rgba(34,211,238,.25)] md:p-6">
 
+        {/* Level */}
         <p className="text-xs font-bold tracking-[0.3em] text-cyan-300">
           LEVEL {levelNumber} OF {totalLevels}
         </p>
 
+        {/* Result */}
         <h2
-          className={`mt-3 text-4xl font-black ${
+          className={`mt-2 text-3xl font-black ${
             success
               ? "text-green-400"
               : "text-red-400"
@@ -59,22 +51,24 @@ export default function FeedbackModal({
             : "MISSION FAILED"}
         </h2>
 
-        <p className="mt-5 text-sm tracking-widest text-slate-400">
+        {/* Model */}
+        <p className="mt-3 text-xs tracking-widest text-slate-400">
           {modelName.toUpperCase()} TOKENIZATION
         </p>
 
-        <h3 className="mt-2 text-3xl font-black text-yellow-300">
+        {/* Word */}
+        <h3 className="mt-1 text-3xl font-black text-yellow-300">
           {word}
         </h3>
 
         {/* Correct answer */}
-        <div className="mt-6 rounded-xl bg-slate-900 p-5">
+        <div className="mt-4 rounded-xl bg-slate-900 p-4">
 
           <p className="text-xs font-bold tracking-widest text-slate-400">
             CORRECT TOKEN SEQUENCE
           </p>
 
-          <p className="mt-3 text-2xl font-black text-green-300">
+          <p className="mt-2 text-2xl font-black text-green-300">
             {correctTokens.join(" + ")}
           </p>
 
@@ -82,10 +76,10 @@ export default function FeedbackModal({
 
         {/* Student answer */}
         {!success && (
-          <div className="mt-4">
+          <div className="mt-3 rounded-xl bg-red-950/30 p-3">
 
-            <p className="text-sm text-slate-400">
-              Your sequence:
+            <p className="text-xs tracking-widest text-slate-400">
+              YOUR SEQUENCE
             </p>
 
             <p className="mt-1 font-bold text-red-300">
@@ -98,37 +92,38 @@ export default function FeedbackModal({
         )}
 
         {/* Explanation */}
-        <div className="mt-6 rounded-xl border border-slate-700 bg-slate-900/80 p-5 text-left">
+        <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/80 p-4 text-left">
 
           <p className="mb-2 font-black text-cyan-300">
             WHY?
           </p>
 
-          <p className="leading-relaxed text-slate-200">
+          <p className="text-sm leading-relaxed text-slate-200 md:text-base">
             {explanation}
           </p>
 
         </div>
 
-        {/* Prototype warning */}
+        {/* Verification warning */}
         {!verified && (
-          <p className="mt-4 text-xs text-orange-300">
-            Development placeholder — tokenizer
-            data still needs to be verified.
+          <p className="mt-3 text-xs text-orange-300">
+            Best guess: we couldn&apos;t check this split against {modelName}&apos;s real tokenizer.
           </p>
         )}
 
-        <p className="mt-6 text-lg font-bold">
+        {/* Score */}
+        <p className="mt-4 text-lg font-bold">
           Current Score:{" "}
           <span className="text-yellow-300">
             {score}
           </span>
         </p>
 
+        {/* Continue */}
         <button
           type="button"
           onClick={onContinue}
-          className="mt-6 rounded-xl bg-green-500 px-10 py-4 text-xl font-black tracking-wider text-white transition hover:scale-105 hover:bg-green-400"
+          className="mt-4 rounded-xl bg-green-500 px-10 py-3 text-lg font-black tracking-wider text-white transition hover:scale-105 hover:bg-green-400"
         >
           {finalLevel
             ? "VIEW RESULTS →"

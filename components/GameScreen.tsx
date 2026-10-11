@@ -2,7 +2,6 @@
 
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -16,20 +15,16 @@ import {
 } from "@/lib/gameLevels";
 
 import { audioManager } from "@/lib/audioManager";
+import { STARS } from "@/lib/starfield";
 
 type GameScreenProps = {
   selectedLLM: LLM;
-
   onBack: () => void;
-
-  onGameComplete: (
-    finalScore: number
-  ) => void;
+  onGameComplete: (finalScore: number) => void;
 };
 
 type Asteroid = {
   id: number;
-
   token: string;
 
   x: number;
@@ -39,9 +34,7 @@ type Asteroid = {
   vy: number;
 
   radius: number;
-
   health: number;
-
   flash: number;
 };
 
@@ -57,25 +50,31 @@ type Bullet = {
 
 type LevelFeedback = {
   success: boolean;
-
   word: string;
-
   correctTokens: string[];
-
   selectedTokens: string[];
-
   explanation: string;
-
   verified: boolean;
 };
 
+type AsteroidOutcome =
+  | "correct"
+  | "wrong-order"
+  | "distractor";
+
 const SHIP_SPEED = 260;
-
 const BULLET_SPEED = 650;
-
 const ASTEROID_HEALTH = 2;
-
 const LEVEL_TIME = 45;
+
+// Ship collision circle, roughly the size of the drawn ship
+const SHIP_RADIUS = 18;
+
+// Damage feedback timings (seconds)
+const INVULNERABLE_TIME = 1.5;
+const DAMAGE_FLASH_TIME = 0.45;
+const SHAKE_TIME = 0.35;
+const POPUP_TIME = 1;
 
 export default function GameScreen({
   selectedLLM,
@@ -87,9 +86,6 @@ export default function GameScreen({
 
   const scoreRef = useRef(0);
 
-  const [levels, setLevels] = useState(() => getLevelsForModel(selectedLLM));
-
-
   const [currentLevelIndex, setCurrentLevelIndex] =
     useState(0);
 
@@ -98,6 +94,10 @@ export default function GameScreen({
 
   const [lives, setLives] =
     useState(3);
+
+  // Bumped on every lost life to replay the HUD heart animation
+  const [damageCount, setDamageCount] =
+    useState(0);
 
   const [timeLeft, setTimeLeft] =
     useState(LEVEL_TIME);
@@ -115,17 +115,20 @@ export default function GameScreen({
   const [
     levelFeedback,
     setLevelFeedback,
-  ] =
-    useState<LevelFeedback | null>(
-      null
+  ] = useState<LevelFeedback | null>(
+    null
+  );
+
+  /*
+   * Generate the five-level campaign.
+   * It is re-rolled when the player restarts.
+   */
+  const [levels, setLevels] =
+    useState(() =>
+      getLevelsForModel(
+        selectedLLM
+      )
     );
-
-  const [round, setRound] =
-    useState(0);
-
-  useEffect(() => {
-    setLevels(getLevelsForModel(selectedLLM));
-  }, [selectedLLM, round]);
 
   const level =
     levels[currentLevelIndex];
@@ -133,10 +136,26 @@ export default function GameScreen({
   const modelName =
     getModelName(selectedLLM);
 
+  /*
+   * Reset the HUD for a fresh level.
+   */
+  function resetLevelState() {
+    setLives(3);
+
+    setTimeLeft(
+      LEVEL_TIME
+    );
+
+    setSelectedTokens([]);
+
+    setMessage(
+      "Destroy the correct token asteroids in order!"
+    );
+  }
+
   function continueGame() {
     setLevelFeedback(null);
 
-    // Last level
     if (
       currentLevelIndex ===
       levels.length - 1
@@ -148,8 +167,11 @@ export default function GameScreen({
       return;
     }
 
+    resetLevelState();
+
     setCurrentLevelIndex(
-      (previous) => previous + 1
+      (previous) =>
+        previous + 1
     );
   }
 
@@ -162,8 +184,12 @@ export default function GameScreen({
 
     setLevelFeedback(null);
 
-    setRound(
-      (previous) => previous + 1
+    resetLevelState();
+
+    setLevels(
+      getLevelsForModel(
+        selectedLLM
+      )
     );
   }
 
@@ -179,7 +205,11 @@ export default function GameScreen({
     if (!ctx) return;
 
     const levelData =
-      levels[currentLevelIndex];
+      levels[
+        currentLevelIndex
+      ];
+
+    if (!levelData) return;
 
     let width = 0;
     let height = 0;
@@ -198,12 +228,13 @@ export default function GameScreen({
 
     let timerAccumulator = 0;
 
-    let selected: string[] = [];
+    const selected: string[] = [];
 
     let asteroids: Asteroid[] =
       [];
 
-    let bullets: Bullet[] = [];
+    const bullets: Bullet[] =
+      [];
 
     const keys =
       new Set<string>();
@@ -219,31 +250,59 @@ export default function GameScreen({
       angle: -Math.PI / 2,
     };
 
-    setLives(3);
+    /*
+     * Damage feedback timers (seconds left).
+     */
+    let invulnerableTime = 0;
+    let damageFlashTime = 0;
+    let shakeTime = 0;
 
-    setTimeLeft(
-      LEVEL_TIME
-    );
+    // Floating "-1 ♥" labels
+    const damagePopups: {
+      x: number;
+      y: number;
+      age: number;
+    }[] = [];
 
-    setSelectedTokens([]);
+    const reduceMotion =
+      window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
 
-    setMessage(
-      "Destroy the correct token asteroids in order!"
-    );
+    /*
+     * Returns the amount of health an
+     * asteroid should have for this level.
+     */
+    function getAsteroidHealth() {
+      const difficulty =
+        levelData.difficulty ||
+        1;
 
+      return (
+        ASTEROID_HEALTH +
+        Math.floor(
+          difficulty / 2
+        )
+      );
+    }
+
+    /*
+     * Create asteroids.
+     */
     function makeAsteroids() {
       const tokens = [
         ...levelData.correctTokens,
         ...levelData.distractors,
       ];
 
-      const radius = Math.min(
-        45,
-        Math.max(
-          32,
-          width / 15
-        )
-      );
+      const radius =
+        Math.min(
+          45,
+          Math.max(
+            32,
+            width / 15
+          )
+        );
 
       return tokens.map(
         (token, index) => {
@@ -257,37 +316,48 @@ export default function GameScreen({
               index / columns
             );
 
-            const speedMult = 1 + ((levelData.difficulty || 1) - 1) * 0.4;
+          const difficulty =
+            levelData.difficulty ||
+            1;
 
-            return {
-              id: index,
+          const speedMult =
+            1 +
+            (difficulty - 1) *
+              0.4;
 
-              token,
+          return {
+            id: index,
 
-              x:
-                width *
-                (0.2 +
-                  column * 0.3),
+            token,
 
-              y:
-                height *
-                (0.2 +
-                  row * 0.25),
+            x:
+              width *
+              (0.2 +
+                column * 0.3),
 
-              vx:
-                (index % 2 === 0
-                  ? 45
-                  : -40) * speedMult,
+            y:
+              height *
+              (0.2 +
+                row * 0.25),
 
-              vy:
-                (index % 3 === 0
-                  ? 35
-                  : -30) * speedMult,
+            vx:
+              (index % 2 ===
+              0
+                ? 45
+                : -40) *
+              speedMult,
 
-              radius,
+            vy:
+              (index % 3 ===
+              0
+                ? 35
+                : -30) *
+              speedMult,
 
-              health:
-                ASTEROID_HEALTH + Math.floor((levelData.difficulty || 1) / 2),
+            radius,
+
+            health:
+              getAsteroidHealth(),
 
             flash: 0,
           };
@@ -295,6 +365,9 @@ export default function GameScreen({
       );
     }
 
+    /*
+     * Resize canvas.
+     */
     function resizeCanvas() {
       const rect =
         canvas!.getBoundingClientRect();
@@ -302,8 +375,12 @@ export default function GameScreen({
       width = rect.width;
       height = rect.height;
 
-      if (!width || !height)
+      if (
+        !width ||
+        !height
+      ) {
         return;
+      }
 
       const dpr =
         window.devicePixelRatio ||
@@ -344,10 +421,14 @@ export default function GameScreen({
         asteroids =
           makeAsteroids();
 
-        initialized = true;
+        initialized =
+          true;
       }
     }
 
+    /*
+     * Keyboard movement.
+     */
     function keyDown(
       event: KeyboardEvent
     ) {
@@ -355,9 +436,12 @@ export default function GameScreen({
         event.key.toLowerCase();
 
       if (
-        ["w", "a", "s", "d"].includes(
-          key
-        )
+        [
+          "w",
+          "a",
+          "s",
+          "d",
+        ].includes(key)
       ) {
         keys.add(key);
       }
@@ -375,6 +459,9 @@ export default function GameScreen({
       keys.clear();
     }
 
+    /*
+     * Mouse aiming.
+     */
     function pointerMove(
       event: PointerEvent
     ) {
@@ -390,6 +477,9 @@ export default function GameScreen({
         rect.top;
     }
 
+    /*
+     * Fire projectile.
+     */
     function shoot(
       event: PointerEvent
     ) {
@@ -404,8 +494,10 @@ export default function GameScreen({
 
       const angle =
         Math.atan2(
-          mouse.y - ship.y,
-          mouse.x - ship.x
+          mouse.y -
+            ship.y,
+          mouse.x -
+            ship.x
         );
 
       bullets.push({
@@ -430,9 +522,14 @@ export default function GameScreen({
         radius: 5,
       });
 
-      audioManager.play("shoot");
+      audioManager.play(
+        "shoot"
+      );
     }
 
+    /*
+     * Finish level.
+     */
     function finishLevel(
       success: boolean
     ) {
@@ -451,7 +548,8 @@ export default function GameScreen({
           250;
 
         const timeBonus =
-          secondsRemaining * 5;
+          secondsRemaining *
+          5;
 
         scoreRef.current +=
           completionBonus +
@@ -484,14 +582,164 @@ export default function GameScreen({
       });
     }
 
+    /*
+     * Lose a life (wrong shot or crash):
+     * update the HUD, start the damage
+     * effects, and end the level at 0 lives.
+     */
+    function loseLife() {
+      livesRemaining =
+        Math.max(
+          0,
+          livesRemaining - 1
+        );
+
+      setLives(
+        livesRemaining
+      );
+
+      setDamageCount(
+        (previous) =>
+          previous + 1
+      );
+
+      invulnerableTime =
+        INVULNERABLE_TIME;
+
+      damageFlashTime =
+        DAMAGE_FLASH_TIME;
+
+      shakeTime = reduceMotion
+        ? 0
+        : SHAKE_TIME;
+
+      damagePopups.push({
+        x: ship.x,
+        y: ship.y - 30,
+        age: 0,
+      });
+
+      if (
+        livesRemaining === 0
+      ) {
+        audioManager.play(
+          "gameOver"
+        );
+
+        finishLevel(false);
+      } else {
+        audioManager.play(
+          "wrong"
+        );
+      }
+    }
+
+    /*
+     * Ship crashes into an asteroid.
+     * Knock them apart so they don't
+     * keep overlapping.
+     */
+    function checkShipCollision() {
+      for (
+        const asteroid
+        of asteroids
+      ) {
+        const dx =
+          ship.x - asteroid.x;
+
+        const dy =
+          ship.y - asteroid.y;
+
+        const distance =
+          Math.hypot(dx, dy);
+
+        const minDistance =
+          SHIP_RADIUS +
+          asteroid.radius;
+
+        if (
+          distance >= minDistance
+        ) {
+          continue;
+        }
+
+        // Direction from asteroid to ship
+        const nx =
+          distance > 0
+            ? dx / distance
+            : 0;
+
+        const ny =
+          distance > 0
+            ? dy / distance
+            : 1;
+
+        ship.x =
+          asteroid.x +
+          nx * (minDistance + 6);
+
+        ship.y =
+          asteroid.y +
+          ny * (minDistance + 6);
+
+        ship.x = Math.max(
+          25,
+          Math.min(width - 25, ship.x)
+        );
+
+        ship.y = Math.max(
+          25,
+          Math.min(height - 25, ship.y)
+        );
+
+        // Send the asteroid off the other way
+        const speed =
+          Math.hypot(
+            asteroid.vx,
+            asteroid.vy
+          );
+
+        asteroid.vx =
+          -nx * speed;
+
+        asteroid.vy =
+          -ny * speed;
+
+        asteroid.flash = 0.3;
+
+        setMessage(
+          "Ouch! Your ship crashed into an asteroid. Steer clear!"
+        );
+
+        loseLife();
+
+        return;
+      }
+    }
+
+    /*
+     * Handles an asteroid after
+     * its health reaches zero.
+     */
     function asteroidDestroyed(
       asteroid: Asteroid
-    ) {
-      const requiredCount = levelData.correctTokens.filter(t => t === asteroid.token).length;
-      const collectedCount = selected.filter(t => t === asteroid.token).length;
+    ): AsteroidOutcome {
+      /*
+       * The next token the player
+       * is supposed to collect.
+       */
+      const expectedToken =
+        levelData.correctTokens[
+          selected.length
+        ];
 
-      // Correct token
-      if (requiredCount > collectedCount) {
+      /*
+       * Correct token AND correct order.
+       */
+      if (
+        asteroid.token ===
+        expectedToken
+      ) {
         selected.push(
           asteroid.token
         );
@@ -511,6 +759,9 @@ export default function GameScreen({
           "Correct token! Keep going!"
         );
 
+        /*
+         * Entire word completed.
+         */
         if (
           selected.length ===
           levelData.correctTokens
@@ -520,26 +771,47 @@ export default function GameScreen({
             "Word complete!"
           );
 
-          audioManager.play("levelComplete");
+          audioManager.play(
+            "levelComplete"
+          );
+
           finishLevel(true);
         } else {
-          audioManager.play("correct");
+          audioManager.play(
+            "correct"
+          );
         }
 
         return "correct";
       }
 
-      // Wrong token
-      livesRemaining =
-        Math.max(
-          0,
-          livesRemaining - 1
+      /*
+       * Determine if this token
+       * belongs later in the sequence.
+       *
+       * Example:
+       *
+       * correct = un + happ + y
+       *
+       * Current expected = un
+       *
+       * Shooting "y" means it is
+       * correct, but too early.
+       */
+      const futureTokens =
+        levelData.correctTokens.slice(
+          selected.length + 1
         );
 
-      setLives(
-        livesRemaining
-      );
+      const isCorrectButTooEarly =
+        futureTokens.includes(
+          asteroid.token
+        );
 
+      /*
+       * All incorrect actions lose
+       * a life and 50 points.
+       */
       scoreRef.current =
         Math.max(
           0,
@@ -551,22 +823,40 @@ export default function GameScreen({
         scoreRef.current
       );
 
-      setMessage(
-        `Incorrect token! Lives remaining: ${livesRemaining}`
-      );
+      /*
+       * Correct token, wrong order.
+       */
+      if (
+        isCorrectButTooEarly
+      ) {
+        setMessage(
+          `"${asteroid.token}" is a correct token, but you shot it too early! Follow the token order.`
+        );
+      }
+
+      /*
+       * Actual distractor.
+       */
+      else {
+        setMessage(
+          `"${asteroid.token}" is not part of the correct token sequence!`
+        );
+      }
+
+      loseLife();
 
       if (
-        livesRemaining === 0
+        isCorrectButTooEarly
       ) {
-        audioManager.play("gameOver");
-        finishLevel(false);
-      } else {
-        audioManager.play("wrong");
+        return "wrong-order";
       }
 
       return "distractor";
     }
 
+    /*
+     * Background.
+     */
     function drawBackground() {
       const gradient =
         ctx!.createLinearGradient(
@@ -599,28 +889,19 @@ export default function GameScreen({
       ctx!.fillStyle =
         "rgba(255,255,255,.65)";
 
-      for (
-        let i = 0;
-        i < 90;
-        i++
-      ) {
-        const x =
-          (i * 173.7) %
-          width;
-
-        const y =
-          (i * 97.3) %
-          height;
-
+      for (const star of STARS) {
         ctx!.fillRect(
-          x,
-          y,
-          2,
-          2
+          star.x * width,
+          star.y * height,
+          star.size,
+          star.size
         );
       }
     }
 
+    /*
+     * Ship.
+     */
     function drawShip() {
       ctx!.save();
 
@@ -633,7 +914,9 @@ export default function GameScreen({
         ship.angle
       );
 
-      // Engine
+      /*
+       * Engine.
+       */
       ctx!.fillStyle =
         "#fb923c";
 
@@ -658,7 +941,9 @@ export default function GameScreen({
 
       ctx!.fill();
 
-      // Ship
+      /*
+       * Ship body.
+       */
       ctx!.fillStyle =
         "#22d3ee";
 
@@ -697,6 +982,9 @@ export default function GameScreen({
       ctx!.restore();
     }
 
+    /*
+     * Asteroid.
+     */
     function drawAsteroid(
       asteroid: Asteroid
     ) {
@@ -719,7 +1007,8 @@ export default function GameScreen({
 
       gradient.addColorStop(
         0,
-        asteroid.flash > 0
+        asteroid.flash >
+          0
           ? "#fde68a"
           : "#94a3b8"
       );
@@ -750,6 +1039,9 @@ export default function GameScreen({
       ctx!.fill();
       ctx!.stroke();
 
+      /*
+       * Craters.
+       */
       ctx!.fillStyle =
         "rgba(15,23,42,.4)";
 
@@ -773,6 +1065,9 @@ export default function GameScreen({
 
       ctx!.fill();
 
+      /*
+       * Token label.
+       */
       ctx!.fillStyle =
         "#ffffff";
 
@@ -791,7 +1086,9 @@ export default function GameScreen({
         0
       );
 
-      // Health
+      /*
+       * Health indicators.
+       */
       for (
         let i = 0;
         i <
@@ -814,6 +1111,9 @@ export default function GameScreen({
       ctx!.restore();
     }
 
+    /*
+     * Bullet.
+     */
     function drawBullet(
       bullet: Bullet
     ) {
@@ -825,7 +1125,8 @@ export default function GameScreen({
       ctx!.shadowColor =
         "#22d3ee";
 
-      ctx!.shadowBlur = 15;
+      ctx!.shadowBlur =
+        15;
 
       ctx!.beginPath();
 
@@ -842,13 +1143,17 @@ export default function GameScreen({
       ctx!.restore();
     }
 
+    /*
+     * Crosshair.
+     */
     function drawCrosshair() {
       ctx!.save();
 
       ctx!.strokeStyle =
         "#67e8f9";
 
-      ctx!.lineWidth = 1.5;
+      ctx!.lineWidth =
+        1.5;
 
       ctx!.beginPath();
 
@@ -880,39 +1185,134 @@ export default function GameScreen({
         mouse.y
       );
 
+      ctx!.moveTo(
+        mouse.x,
+        mouse.y - 16
+      );
+
+      ctx!.lineTo(
+        mouse.x,
+        mouse.y - 5
+      );
+
+      ctx!.moveTo(
+        mouse.x,
+        mouse.y + 5
+      );
+
+      ctx!.lineTo(
+        mouse.x,
+        mouse.y + 16
+      );
+
       ctx!.stroke();
 
       ctx!.restore();
     }
 
-    let animationFrame = 0;
+    let animationFrame =
+      0;
 
     let previousTime =
       performance.now();
 
+    /*
+     * Red flash around the edges
+     * after losing a life.
+     */
+    function drawDamageFlash() {
+      if (damageFlashTime <= 0) return;
+
+      const strength =
+        damageFlashTime /
+        DAMAGE_FLASH_TIME;
+
+      const gradient =
+        ctx!.createRadialGradient(
+          width / 2,
+          height / 2,
+          Math.min(width, height) * 0.25,
+          width / 2,
+          height / 2,
+          Math.max(width, height) * 0.7
+        );
+
+      gradient.addColorStop(
+        0,
+        `rgba(239, 68, 68, ${0.08 * strength})`
+      );
+
+      gradient.addColorStop(
+        1,
+        `rgba(239, 68, 68, ${0.6 * strength})`
+      );
+
+      ctx!.fillStyle = gradient;
+
+      ctx!.fillRect(0, 0, width, height);
+    }
+
+    /*
+     * Floating "-1 ♥" that rises and fades.
+     */
+    function drawDamagePopups() {
+      ctx!.save();
+
+      ctx!.font =
+        "bold 22px Arial, sans-serif";
+
+      ctx!.textAlign = "center";
+
+      for (const popup of damagePopups) {
+        const progress =
+          popup.age / POPUP_TIME;
+
+        ctx!.globalAlpha =
+          1 - progress;
+
+        ctx!.fillStyle = "#f87171";
+
+        ctx!.fillText(
+          "-1 ♥",
+          popup.x,
+          popup.y - progress * 40
+        );
+      }
+
+      ctx!.restore();
+    }
+
+    /*
+     * Main game loop.
+     */
     function gameLoop(
       now: number
     ) {
-      const dt = Math.min(
-        (now -
-          previousTime) /
-          1000,
-        0.033
-      );
+      const dt =
+        Math.min(
+          (now -
+            previousTime) /
+            1000,
+          0.033
+        );
 
-      previousTime = now;
+      previousTime =
+        now;
 
       if (
         initialized &&
         levelStatus ===
           "playing"
       ) {
-        // Timer
+        /*
+         * Timer.
+         */
         timerAccumulator +=
           dt;
 
         if (
-          timerAccumulator >= 1
+          timerAccumulator >=
+          1
         ) {
           const seconds =
             Math.floor(
@@ -941,25 +1341,35 @@ export default function GameScreen({
               "Time's up!"
             );
 
+            audioManager.play(
+              "gameOver"
+            );
+
             finishLevel(false);
           }
         }
 
-        // WASD
+        /*
+         * WASD movement.
+         */
         let dx = 0;
         let dy = 0;
 
-        if (keys.has("w"))
+        if (keys.has("w")) {
           dy -= 1;
+        }
 
-        if (keys.has("s"))
+        if (keys.has("s")) {
           dy += 1;
+        }
 
-        if (keys.has("a"))
+        if (keys.has("a")) {
           dx -= 1;
+        }
 
-        if (keys.has("d"))
+        if (keys.has("d")) {
           dx += 1;
+        }
 
         const magnitude =
           Math.hypot(
@@ -971,7 +1381,6 @@ export default function GameScreen({
           magnitude > 0
         ) {
           dx /= magnitude;
-
           dy /= magnitude;
         }
 
@@ -985,21 +1394,23 @@ export default function GameScreen({
           SHIP_SPEED *
           dt;
 
-        ship.x = Math.max(
-          25,
-          Math.min(
-            width - 25,
-            ship.x
-          )
-        );
+        ship.x =
+          Math.max(
+            25,
+            Math.min(
+              width - 25,
+              ship.x
+            )
+          );
 
-        ship.y = Math.max(
-          25,
-          Math.min(
-            height - 25,
-            ship.y
-          )
-        );
+        ship.y =
+          Math.max(
+            25,
+            Math.min(
+              height - 25,
+              ship.y
+            )
+          );
 
         ship.angle =
           Math.atan2(
@@ -1009,7 +1420,9 @@ export default function GameScreen({
               ship.x
           );
 
-        // Asteroids
+        /*
+         * Move asteroids.
+         */
         for (
           const asteroid
           of asteroids
@@ -1029,6 +1442,9 @@ export default function GameScreen({
                 dt
             );
 
+          /*
+           * Horizontal bounce.
+           */
           if (
             asteroid.x -
                 asteroid.radius <
@@ -1039,8 +1455,21 @@ export default function GameScreen({
           ) {
             asteroid.vx *=
               -1;
+
+            asteroid.x =
+              Math.max(
+                asteroid.radius,
+                Math.min(
+                  width -
+                    asteroid.radius,
+                  asteroid.x
+                )
+              );
           }
 
+          /*
+           * Vertical bounce.
+           */
           if (
             asteroid.y -
                 asteroid.radius <
@@ -1051,10 +1480,30 @@ export default function GameScreen({
           ) {
             asteroid.vy *=
               -1;
+
+            asteroid.y =
+              Math.max(
+                asteroid.radius,
+                Math.min(
+                  height -
+                    asteroid.radius,
+                  asteroid.y
+                )
+              );
           }
         }
 
-        // Bullets
+        /*
+         * Ship vs asteroid crashes
+         * (skipped while recovering from a hit).
+         */
+        if (invulnerableTime <= 0) {
+          checkShipCollision();
+        }
+
+        /*
+         * Bullets.
+         */
         for (
           let i =
             bullets.length -
@@ -1073,6 +1522,10 @@ export default function GameScreen({
             bullet.vy *
             dt;
 
+          /*
+           * Remove bullet if it
+           * leaves the arena.
+           */
           if (
             bullet.x < 0 ||
             bullet.x >
@@ -1089,6 +1542,9 @@ export default function GameScreen({
             continue;
           }
 
+          /*
+           * Collision detection.
+           */
           for (
             let j =
               asteroids.length -
@@ -1112,29 +1568,90 @@ export default function GameScreen({
               bullet.radius +
                 asteroid.radius
             ) {
+              /*
+               * Bullet disappears.
+               */
               bullets.splice(
                 i,
                 1
               );
 
+              /*
+               * Damage asteroid.
+               */
               asteroid.health -=
                 1;
 
               asteroid.flash =
                 0.15;
 
+              /*
+               * Asteroid reaches zero health.
+               */
               if (
                 asteroid.health <=
                 0
               ) {
-                const outcome = asteroidDestroyed(
-                  asteroid
-                );
+                const outcome =
+                  asteroidDestroyed(
+                    asteroid
+                  );
 
-                asteroids.splice(
-                  j,
-                  1
-                );
+                /*
+                 * Correct token:
+                 * break and disappear.
+                 */
+                if (
+                  outcome ===
+                  "correct"
+                ) {
+                  asteroids.splice(
+                    j,
+                    1
+                  );
+                }
+
+                /*
+                 * Real distractor:
+                 * break and disappear.
+                 */
+                else if (
+                  outcome ===
+                  "distractor"
+                ) {
+                  asteroids.splice(
+                    j,
+                    1
+                  );
+                }
+
+                /*
+                 * Correct token shot
+                 * in the WRONG order.
+                 *
+                 * Do NOT remove it.
+                 * Restore its health so
+                 * the student can shoot
+                 * it later.
+                 */
+                else {
+                  asteroid.health =
+                    getAsteroidHealth();
+
+                  asteroid.flash =
+                    0.4;
+
+                  /*
+                   * Bounce it away so
+                   * the player can see
+                   * that it survived.
+                   */
+                  asteroid.vx *=
+                    -1;
+
+                  asteroid.vy *=
+                    -1;
+                }
               }
 
               break;
@@ -1143,7 +1660,51 @@ export default function GameScreen({
         }
       }
 
+      /*
+       * Damage effect timers keep running
+       * after the level ends so they fade out.
+       */
+      invulnerableTime =
+        Math.max(0, invulnerableTime - dt);
+
+      damageFlashTime =
+        Math.max(0, damageFlashTime - dt);
+
+      shakeTime =
+        Math.max(0, shakeTime - dt);
+
+      for (
+        let i = damagePopups.length - 1;
+        i >= 0;
+        i--
+      ) {
+        damagePopups[i].age += dt;
+
+        if (
+          damagePopups[i].age >=
+          POPUP_TIME
+        ) {
+          damagePopups.splice(i, 1);
+        }
+      }
+
+      /*
+       * Draw everything.
+       */
       drawBackground();
+
+      ctx!.save();
+
+      // Screen shake after a hit
+      if (shakeTime > 0) {
+        const amount =
+          8 * (shakeTime / SHAKE_TIME);
+
+        ctx!.translate(
+          (Math.random() * 2 - 1) * amount,
+          (Math.random() * 2 - 1) * amount
+        );
+      }
 
       for (
         const asteroid
@@ -1163,8 +1724,20 @@ export default function GameScreen({
         );
       }
 
-      drawShip();
+      // Ship blinks while invulnerable
+      const shipHidden =
+        invulnerableTime > 0 &&
+        Math.floor(invulnerableTime * 10) % 2 === 0;
 
+      if (!shipHidden) {
+        drawShip();
+      }
+
+      drawDamagePopups();
+
+      ctx!.restore();
+
+      drawDamageFlash();
       drawCrosshair();
 
       animationFrame =
@@ -1173,6 +1746,9 @@ export default function GameScreen({
         );
     }
 
+    /*
+     * Event listeners.
+     */
     window.addEventListener(
       "keydown",
       keyDown
@@ -1214,6 +1790,9 @@ export default function GameScreen({
         gameLoop
       );
 
+    /*
+     * Cleanup.
+     */
     return () => {
       cancelAnimationFrame(
         animationFrame
@@ -1248,156 +1827,203 @@ export default function GameScreen({
     };
   }, [
     currentLevelIndex,
-    round,
     selectedLLM,
     levels,
   ]);
 
   return (
-  <main className="h-screen w-screen overflow-hidden bg-[#050816] p-3 text-white">
+    <main className="h-screen w-screen overflow-hidden bg-[#050816] p-3 text-white">
 
-    <div className="flex h-full w-full flex-col">
+      <div className="flex h-full w-full flex-col">
 
-      {/* HUD */}
-      <header className="grid shrink-0 grid-cols-4 items-center rounded-xl border border-cyan-500/40 bg-slate-900 px-4 py-2 text-center">
+        {/* HUD */}
+        <header className="grid shrink-0 grid-cols-4 items-center rounded-xl border border-cyan-500/40 bg-slate-900 px-4 py-2 text-center">
 
-        <div>
-          <p className="text-[10px] text-slate-400">
-            LEVEL
-          </p>
+          <div>
+            <p className="text-[10px] text-slate-400">
+              LEVEL
+            </p>
 
-          <p className="text-lg font-black">
-            {currentLevelIndex + 1}/{levels.length}
-          </p>
-        </div>
+            <p className="text-lg font-black">
+              {currentLevelIndex +
+                1}
+              /{levels.length}
+            </p>
+          </div>
 
-        <div>
-          <p className="text-[10px] text-slate-400">
-            SCORE
-          </p>
+          <div>
+            <p className="text-[10px] text-slate-400">
+              SCORE
+            </p>
 
-          <p className="text-lg font-black text-yellow-300">
-            ★ {score}
-          </p>
-        </div>
+            <p className="text-lg font-black text-yellow-300">
+              ★ {score}
+            </p>
+          </div>
 
-        <div>
-          <p className="text-[10px] text-slate-400">
-            LIVES
-          </p>
+          <div>
+            <p className="text-[10px] text-slate-400">
+              LIVES
+            </p>
 
-          <p className="text-lg text-red-400">
-            {"♥".repeat(lives)}
+            <p
+              key={damageCount}
+              className={`text-lg text-red-400 ${
+                damageCount > 0
+                  ? "hud-heart-hit"
+                  : ""
+              }`}
+            >
+              {"♥".repeat(
+                lives
+              )}
 
-            <span className="text-slate-600">
-              {"♥".repeat(3 - lives)}
+              <span className="text-slate-600">
+                {"♥".repeat(
+                  3 - lives
+                )}
+              </span>
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[10px] text-slate-400">
+              TIME
+            </p>
+
+            <p className="text-lg font-black text-cyan-300">
+              {timeLeft}s
+            </p>
+          </div>
+
+        </header>
+
+        {/* Target Word */}
+        <section className="shrink-0 py-2 text-center">
+
+          <p className="text-xs tracking-[0.25em] text-slate-300">
+            TOKENIZING WITH{" "}
+            <span className="font-bold text-cyan-300">
+              {modelName}
+            </span>
+
+            <span className="mx-3 text-slate-600">
+              |
+            </span>
+
+            DIFFICULTY{" "}
+            <span className="text-base font-bold tracking-normal text-yellow-300">
+              {"★".repeat(
+                level.difficulty
+              )}
+
+              {"☆".repeat(
+                3 -
+                  level.difficulty
+              )}
             </span>
           </p>
-        </div>
 
-        <div>
-          <p className="text-[10px] text-slate-400">
-            TIME
+          <p className="mt-1 text-xs tracking-[0.3em] text-slate-300">
+            TARGET WORD
           </p>
 
-          <p className="text-lg font-black text-cyan-300">
-            {timeLeft}s
-          </p>
-        </div>
+          <h1 className="text-3xl font-black uppercase text-yellow-300">
+            {level.word}
+          </h1>
 
-      </header>
+        </section>
 
-      {/* TARGET WORD */}
-      <section className="shrink-0 py-2 text-center">
+        {/* Game Arena */}
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border-2 border-cyan-500/40">
 
-        <p className="text-[10px] tracking-[0.25em] text-slate-400">
-          TOKENIZING WITH{" "}
-          <span className="font-bold text-cyan-300">
-            {modelName}
-          </span>
-        </p>
-
-        <p className="mt-1 text-[10px] tracking-[0.3em] text-slate-400">
-          TARGET WORD
-        </p>
-
-        <h1 className="text-3xl font-black text-yellow-300">
-          {level.word}
-        </h1>
-
-      </section>
-
-      {/* GAME ARENA */}
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border-2 border-cyan-500/40">
-
-        <canvas
-          ref={canvasRef}
-          className="block h-full w-full cursor-crosshair"
-        />
-
-        {levelFeedback && (
-          <FeedbackModal
-            success={levelFeedback.success}
-            modelName={modelName}
-            word={levelFeedback.word}
-            correctTokens={levelFeedback.correctTokens}
-            selectedTokens={levelFeedback.selectedTokens}
-            explanation={levelFeedback.explanation}
-            score={score}
-            verified={levelFeedback.verified}
-            levelNumber={currentLevelIndex + 1}
-            totalLevels={levels.length}
-            onContinue={continueGame}
+          <canvas
+            ref={canvasRef}
+            className="block h-full w-full cursor-crosshair"
           />
-        )}
+
+          {levelFeedback && (
+            <FeedbackModal
+              success={
+                levelFeedback.success
+              }
+              modelName={
+                modelName
+              }
+              word={
+                levelFeedback.word
+              }
+              correctTokens={
+                levelFeedback.correctTokens
+              }
+              selectedTokens={
+                levelFeedback.selectedTokens
+              }
+              explanation={
+                levelFeedback.explanation
+              }
+              score={score}
+              verified={
+                levelFeedback.verified
+              }
+              levelNumber={
+                currentLevelIndex +
+                1
+              }
+              totalLevels={
+                levels.length
+              }
+              onContinue={
+                continueGame
+              }
+            />
+          )}
+
+        </div>
+
+        {/* Bottom HUD */}
+        <section className="mt-2 grid shrink-0 grid-cols-[auto_1fr_auto] items-center gap-4 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2">
+
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-bold hover:bg-slate-600"
+          >
+            ← EXIT
+          </button>
+
+          <div className="text-center">
+
+            <p className="text-[10px] tracking-widest text-slate-400">
+              TOKEN SEQUENCE
+            </p>
+
+            <p className="font-black text-yellow-300">
+              {selectedTokens.length
+                ? selectedTokens.join(
+                    " + "
+                  )
+                : "—"}
+            </p>
+
+            <p className="text-xs text-cyan-300">
+              {message}
+            </p>
+
+          </div>
+
+          <button
+            type="button"
+            onClick={restartGame}
+            className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-bold hover:bg-cyan-600"
+          >
+            RESTART
+          </button>
+
+        </section>
 
       </div>
 
-      {/* BOTTOM HUD */}
-      <section className="mt-2 grid shrink-0 grid-cols-[auto_1fr_auto] items-center gap-4 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2">
-
-        {/* Exit */}
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-bold hover:bg-slate-600"
-        >
-          ← EXIT
-        </button>
-
-        {/* Token sequence */}
-        <div className="text-center">
-
-          <p className="text-[10px] tracking-widest text-slate-400">
-            TOKEN SEQUENCE
-          </p>
-
-          <p className="font-black text-yellow-300">
-            {selectedTokens.length
-              ? selectedTokens.join(" + ")
-              : "—"}
-          </p>
-
-          <p className="text-xs text-cyan-300">
-            {message}
-          </p>
-
-        </div>
-
-        {/* Restart */}
-        <button
-          type="button"
-          onClick={restartGame}
-          className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-bold hover:bg-cyan-600"
-        >
-          RESTART
-        </button>
-
-      </section>
-
-    </div>
-
-  </main>
-);
-    
+    </main>
+  );
 }

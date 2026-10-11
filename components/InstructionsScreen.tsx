@@ -1,183 +1,222 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 
 type InstructionsScreenProps = {
   onBack: () => void;
   onStart: () => void;
 };
 
+/*
+ * Crawl speed multipliers the player can pick.
+ * 1 = the base 80s crawl set in globals.css (.briefing-crawl).
+ */
+const SPEED_OPTIONS = [0.5, 1, 2, 3];
+const DEFAULT_SPEED = 1;
+
+/*
+ * Points shown in the briefing.
+ * Keep in sync with the scoring in GameScreen.
+ */
+const SCORING = [
+  { points: "+100", text: "each correct token, in order" },
+  { points: "+250", text: "for rebuilding the whole word" },
+  { points: "+5", text: "for every second left on the clock" },
+  { points: "-50", text: "and 1 life for shooting a wrong piece or a right piece out of order" },
+  { points: "-1 ♥", text: "for crashing your ship into an asteroid" },
+];
+
+/*
+ * Star Wars-style scrolling mission briefing.
+ * Crawl styles live in globals.css (.briefing-*).
+ */
 export default function InstructionsScreen({
   onBack,
   onStart,
 }: InstructionsScreenProps) {
+  // Finished crawling (or no animation for reduced-motion users)
+  const [crawlDone, setCrawlDone] =
+    useState(
+      () =>
+        typeof window !== "undefined" &&
+        window.matchMedia(
+          "(prefers-reduced-motion: reduce)"
+        ).matches
+    );
+
+  const [speed, setSpeed] =
+    useState(DEFAULT_SPEED);
+
+  const crawlRef =
+    useRef<HTMLDivElement>(null);
+
+  /*
+   * Apply the multiplier to the running CSS
+   * animation; it keeps its place in the text.
+   */
+  useEffect(() => {
+    crawlRef.current
+      ?.getAnimations()
+      .forEach((animation) =>
+        animation.updatePlaybackRate(speed)
+      );
+  }, [speed]);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#080b20] px-6 py-8 text-white">
+    <main className="relative min-h-screen overflow-hidden bg-black text-white">
 
       {/* Star background */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-60"
+        className="pointer-events-none absolute inset-0 opacity-70"
         style={{
           backgroundImage: `
             radial-gradient(2px 2px at 20px 30px, white 98%, transparent),
             radial-gradient(2px 2px at 100px 80px, white 98%, transparent),
             radial-gradient(1px 1px at 170px 130px, white 98%, transparent),
-            radial-gradient(2px 2px at 250px 200px, white 98%, transparent)
+            radial-gradient(2px 2px at 250px 200px, white 98%, transparent),
+            radial-gradient(1px 1px at 300px 60px, white 98%, transparent),
+            radial-gradient(2px 2px at 400px 150px, white 98%, transparent)
           `,
-          backgroundSize: "350px 250px",
+          backgroundSize: "450px 250px",
         }}
       />
 
-      {/* Background glow */}
-      <div className="pointer-events-none absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-purple-600/20 blur-3xl" />
+      {/* Scrolling briefing */}
+      <div className="briefing-container">
 
-      {/* Main content */}
-      <div className="relative z-10 mx-auto max-w-5xl">
+        <div className="briefing-plane">
 
-        {/* Header */}
-        <header className="mb-10 text-center">
+          <div
+            ref={crawlRef}
+            className="briefing-crawl"
+            onAnimationEnd={() =>
+              setCrawlDone(true)
+            }
+          >
 
-          <p className="mb-3 text-sm font-bold tracking-[0.4em] text-cyan-400">
-            TOKEN BLAST
-          </p>
+            <p className="briefing-episode">
+              MISSION BRIEFING
+            </p>
 
-          <h1 className="text-4xl font-black tracking-wider text-yellow-300 md:text-6xl">
-            MISSION BRIEFING
-          </h1>
+            <h1 className="briefing-title">
+              TOKEN BLAST
+            </h1>
 
-          <p className="mt-4 text-slate-300">
-            Learn how to complete your tokenization mission!
-          </p>
+            <p>
+              AI chatbots don&apos;t read words the way you do.
+              Before an AI can understand a word, it chops it
+              into smaller pieces called TOKENS.
+            </p>
 
-        </header>
+            <p>
+              Some words stay whole. Others get split into
+              pieces. Different AIs can split the same
+              word in different ways!
+            </p>
 
-        {/* Astronaut and instructions */}
-        <section className="mb-10 grid items-center gap-6 md:grid-cols-[180px_1fr]">
-
-          {/* Astronaut */}
-          <div className="flex justify-center">
-
-            <div className="flex h-40 w-40 items-center justify-center rounded-full border-4 border-cyan-400 bg-slate-800 shadow-[0_0_35px_rgba(34,211,238,0.3)]">
-
-              <span className="text-7xl">
-                👨‍🚀
-              </span>
-
-            </div>
-
-          </div>
-
-          {/* Speech bubble */}
-          <div className="rounded-2xl border-4 border-cyan-400 bg-slate-100 p-6 text-slate-900 shadow-lg">
-
-            <h2 className="mb-3 text-2xl font-black">
-              Welcome, Space Ranger!
+            <h2 className="briefing-heading">
+              YOUR MISSION
             </h2>
 
-            <p className="mb-4 text-lg">
-              AI breaks words into smaller pieces called
-              tokens to understand them like we do!
+            <p>
+              Choose an AI and fly into its asteroid field.
+              Each level gives you a TARGET WORD. Blast the
+              asteroids holding that AI&apos;s tokens, IN ORDER,
+              to rebuild the word.
             </p>
 
-            <p className="mb-4 text-lg">
-              Your mission is to shoot the correct token
-              fragments in order to help out our AI.
+            <p>
+              Fly with W A S D. Aim with your mouse.
+              Click to fire. Each asteroid takes a few hits
+              to break.
             </p>
 
-            <p className="text-lg font-bold text-red-700">
-              Watch out for incorrect fragments!
+            <h2 className="briefing-heading">
+              SCORING
+            </h2>
+
+            <ul className="briefing-scoring">
+              {SCORING.map((row) => (
+                <li key={row.text}>
+                  <span className="briefing-points">
+                    {row.points}
+                  </span>
+                  {row.text}
+                </li>
+              ))}
+            </ul>
+
+            <p>
+              You have 3 lives and 45 seconds for each word.
+              Lose every life or run out of time and the
+              mission fails.
+            </p>
+
+            <p>
+              Rebuild all 5 words, put your initials on the
+              leaderboard, and become the galaxy&apos;s top
+              pilot.
+            </p>
+
+            <p className="briefing-signoff">
+              Good luck!
             </p>
 
           </div>
-
-        </section>
-
-        {/* Example demonstration */}
-        <section className="rounded-2xl border-2 border-slate-600 bg-slate-900/90 p-6 shadow-xl">
-
-          <h2 className="mb-6 text-center text-2xl font-black tracking-widest text-yellow-300">
-            HOW IT WORKS
-          </h2>
-
-          {/* Target word */}
-          <div className="mb-8 text-center">
-
-            <p className="mb-2 text-sm tracking-widest text-slate-400">
-              TARGET WORD
-            </p>
-
-            <h3 className="text-4xl font-black text-cyan-400">
-              PLAYING
-            </h3>
-
-          </div>
-
-          {/* Example asteroids */}
-          <div className="mb-8 flex flex-wrap items-center justify-center gap-6">
-
-            <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-slate-400 bg-gradient-to-br from-slate-500 to-slate-800 text-xl font-bold shadow-lg">
-              play
-            </div>
-
-            <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-slate-400 bg-gradient-to-br from-slate-500 to-slate-800 text-xl font-bold shadow-lg">
-              ing
-            </div>
-
-            <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-slate-400 bg-gradient-to-br from-slate-500 to-slate-800 text-xl font-bold shadow-lg">
-              pla
-            </div>
-
-          </div>
-
-          {/* Token sequence example */}
-          <div className="text-center">
-
-            <p className="mb-4 text-slate-300">
-              Shoot the correct fragments in order!
-            </p>
-
-            <div className="flex flex-wrap items-center justify-center gap-3">
-
-              <span className="rounded-lg bg-green-600 px-5 py-3 text-xl font-bold">
-                play
-              </span>
-
-              <span className="text-2xl">+</span>
-
-              <span className="rounded-lg bg-green-600 px-5 py-3 text-xl font-bold">
-                ing
-              </span>
-
-              <span className="text-2xl">=</span>
-
-              <span className="text-2xl font-black text-yellow-300">
-                playing
-              </span>
-
-            </div>
-
-          </div>
-
-        </section>
-
-        {/* Navigation buttons */}
-        <div className="mt-10 flex flex-wrap items-center justify-between gap-4">
-
-          <button
-            type="button"
-            onClick={onBack}
-            className="rounded-xl border-2 border-slate-400 bg-slate-700 px-8 py-4 text-lg font-black transition hover:bg-slate-600"
-          >
-            ← BACK
-          </button>
-
-          <button
-            type="button"
-            onClick={onStart}
-            className="rounded-xl border-4 border-green-300 bg-green-500 px-10 py-4 text-xl font-black tracking-widest shadow-[0_6px_0_#166534] transition hover:scale-105 hover:bg-green-400"
-          >
-            START GAME →
-          </button>
 
         </div>
+
+      </div>
+
+      {/* Crawl speed (hidden once it's finished or for reduced motion) */}
+      {!crawlDone && (
+        <div
+          role="group"
+          aria-label="Scroll speed"
+          className="absolute right-4 top-4 z-20 flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-900/80 px-3 py-2"
+        >
+          <span className="mr-1 text-xs font-bold tracking-widest text-slate-400">
+            SPEED
+          </span>
+
+          {SPEED_OPTIONS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={speed === option}
+              onClick={() => setSpeed(option)}
+              className={`rounded-md px-3 py-1 text-sm font-black transition ${
+                speed === option
+                  ? "bg-yellow-300 text-slate-950"
+                  : "text-slate-300 hover:bg-slate-700"
+              }`}
+            >
+              {option}×
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Stationary buttons */}
+      <div className="absolute bottom-10 left-1/2 z-20 flex -translate-x-1/2 items-center gap-4">
+
+        <button
+          type="button"
+          onClick={onBack}
+          className="whitespace-nowrap rounded-xl border-2 border-slate-400 bg-slate-800/90 px-5 py-3 text-lg font-black transition hover:bg-slate-700 sm:px-6"
+        >
+          ← BACK
+        </button>
+
+        <button
+          type="button"
+          onClick={onStart}
+          className="whitespace-nowrap rounded-xl border-4 border-green-300 bg-green-500 px-6 py-3 sm:px-10 text-xl font-black tracking-widest shadow-[0_6px_0_#166534] transition hover:scale-105 hover:bg-green-400 active:translate-y-1"
+        >
+          {crawlDone
+            ? "CONTINUE →"
+            : "SKIP →"}
+        </button>
 
       </div>
 

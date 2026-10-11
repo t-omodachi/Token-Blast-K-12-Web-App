@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { audioManager } from "@/lib/audioManager";
+import { STARS } from "@/lib/starfield";
+
 type LLM = "chatgpt" | "gemini" | "claude";
 
 type DemoScreenProps = {
@@ -216,6 +219,8 @@ export default function DemoScreen({
 
         radius: 5,
       });
+
+      audioManager.play("shoot");
     }
 
     function drawShip() {
@@ -470,18 +475,12 @@ export default function DemoScreen({
       ctx!.fillStyle =
         "rgba(255,255,255,.7)";
 
-      for (let i = 0; i < 90; i++) {
-        const x =
-          (i * 173.7) % width;
-
-        const y =
-          (i * 97.3) % height;
-
+      for (const star of STARS) {
         ctx!.fillRect(
-          x,
-          y,
-          2,
-          2
+          star.x * width,
+          star.y * height,
+          star.size,
+          star.size
         );
       }
     }
@@ -759,12 +758,12 @@ export default function DemoScreen({
       : "Claude";
 
   return (
-    <main className="min-h-screen bg-[#050816] px-4 py-5 text-white">
+    <main className="h-screen overflow-hidden bg-[#050816] px-4 py-4 text-white">
 
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto flex h-full w-full max-w-6xl flex-col">
 
         {/* Header */}
-        <header className="mb-4 flex items-center justify-between rounded-xl border border-cyan-500/40 bg-slate-900 px-5 py-4">
+        <header className="mb-3 flex shrink-0 items-center justify-between rounded-xl border border-cyan-500/40 bg-slate-900 px-5 py-3">
 
           <div>
             <p className="text-xs tracking-widest text-slate-400">
@@ -789,7 +788,7 @@ export default function DemoScreen({
         </header>
 
         {/* Word */}
-        <section className="mb-4 text-center">
+        <section className="mb-3 shrink-0 text-center">
 
           <p className="text-xs tracking-[0.3em] text-slate-400">
             TRAINING WORD
@@ -802,21 +801,21 @@ export default function DemoScreen({
         </section>
 
         {/* Arena */}
-        <div className="relative overflow-hidden rounded-xl border-2 border-cyan-500/40">
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border-2 border-cyan-500/40">
 
           <canvas
             ref={canvasRef}
-            className="block h-[60vh] min-h-[440px] w-full cursor-crosshair"
+            className="block h-full w-full cursor-crosshair"
           />
 
           {/* Tutorial speech bubble */}
-          <div className="pointer-events-none absolute left-5 top-5 max-w-sm rounded-2xl border-2 border-cyan-300 bg-slate-950/95 p-5 shadow-[0_0_25px_rgba(34,211,238,.25)]">
+          <div className="pointer-events-none absolute bottom-4 left-4 max-w-xs rounded-2xl border-2 border-cyan-300 bg-slate-950/95 px-4 py-3 shadow-[0_0_25px_rgba(34,211,238,.25)]">
 
-            <p className="mb-2 text-xs font-bold tracking-widest text-cyan-300">
+            <p className="mb-1 text-xs font-bold tracking-widest text-cyan-300">
               FLIGHT COMPUTER
             </p>
 
-            <p className="text-lg font-bold">
+            <p className="font-bold">
               {message}
             </p>
 
@@ -867,28 +866,42 @@ export default function DemoScreen({
 
         </div>
 
-        {/* Progress */}
-        <section className="mt-4 rounded-xl border border-slate-700 bg-slate-900 p-4 text-center">
+        {/* Bottom bar: back, progress, skip (like the game's bottom bar) */}
+        <section className="mt-3 grid shrink-0 grid-cols-2 items-center gap-3 rounded-xl border border-slate-700 bg-slate-900 p-3 sm:grid-cols-[1fr_auto_1fr]">
 
-          <p className="text-xs tracking-widest text-slate-400">
-            TOKEN SEQUENCE
-          </p>
+          <div className="col-span-2 text-center sm:order-2 sm:col-span-1">
+            <p className="text-xs tracking-widest text-slate-400">
+              TOKEN SEQUENCE
+            </p>
 
-          <p className="mt-2 text-xl font-black text-yellow-300">
-            {selectedTokens.length
-              ? selectedTokens.join(" + ")
-              : "—"}
-          </p>
+            <p className="mt-1 text-xl font-black text-yellow-300">
+              {selectedTokens.length
+                ? selectedTokens.join(" + ")
+                : "—"}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onBack}
+            className="justify-self-start whitespace-nowrap rounded-lg bg-slate-700 px-4 py-3 font-bold hover:bg-slate-600 sm:order-1 sm:px-6"
+          >
+            ← CHANGE AI
+          </button>
+
+          <div className="justify-self-end sm:order-3">
+            {stage !== "complete" && (
+              <button
+                type="button"
+                onClick={onComplete}
+                className="whitespace-nowrap rounded-lg border-2 border-green-300/70 bg-green-600 px-4 py-3 font-black tracking-wider transition hover:bg-green-500 sm:px-6"
+              >
+                SKIP TRAINING →
+              </button>
+            )}
+          </div>
 
         </section>
-
-        <button
-          type="button"
-          onClick={onBack}
-          className="mt-5 rounded-lg bg-slate-700 px-6 py-3 font-bold hover:bg-slate-600"
-        >
-          ← CHANGE AI
-        </button>
 
       </div>
 
