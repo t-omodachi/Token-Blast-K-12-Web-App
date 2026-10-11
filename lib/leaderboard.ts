@@ -84,6 +84,17 @@ export async function saveScore(
 }
 
 /*
+ * Wipes every saved score (researcher panel only).
+ */
+export async function clearScores() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage blocked; nothing to clear
+  }
+}
+
+/*
  * Top `count` entries, optionally for a single model.
  * Expects entries already sorted by getScores().
  */

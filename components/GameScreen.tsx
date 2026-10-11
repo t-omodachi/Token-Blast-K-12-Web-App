@@ -11,11 +11,42 @@ import FeedbackModal from "./FeedbackModal";
 import {
   getLevelsForModel,
   getModelName,
+  type LevelData,
   type LLM,
 } from "@/lib/gameLevels";
 
 import { audioManager } from "@/lib/audioManager";
 import { STARS } from "@/lib/starfield";
+
+import {
+  logEvent,
+  msSinceRunStart,
+  startRun,
+} from "@/lib/researchLog";
+
+/*
+ * Level context attached to every research log row.
+ */
+function levelLogFields(
+  model: LLM,
+  level: LevelData | undefined,
+  index: number
+) {
+  return {
+    model,
+    level: index + 1,
+    word: level?.word,
+    difficulty: level?.difficulty,
+    correct_split: level?.correctTokens.join(" + "),
+  };
+}
+
+// Ratio rounded to 3 decimals, blank when nothing to divide by
+function ratio(part: number, total: number) {
+  return total > 0
+    ? Math.round((part / total) * 1000) / 1000
+    : undefined;
+}
 
 type GameScreenProps = {
   selectedLLM: LLM;
@@ -86,6 +117,10 @@ export default function GameScreen({
 
   const scoreRef = useRef(0);
 
+  // When the current feedback popup opened (research timing)
+  const feedbackOpenedAt =
+    useRef<number | null>(null);
+
   const [currentLevelIndex, setCurrentLevelIndex] =
     useState(0);
 
@@ -154,12 +189,36 @@ export default function GameScreen({
   }
 
   function continueGame() {
+    logEvent("feedback_close", {
+      ...levelLogFields(
+        selectedLLM,
+        levels[currentLevelIndex],
+        currentLevelIndex
+      ),
+      result: levelFeedback?.success
+        ? "completed"
+        : "failed",
+      duration_ms:
+        feedbackOpenedAt.current === null
+          ? undefined
+          : Date.now() -
+            feedbackOpenedAt.current,
+    });
+
+    feedbackOpenedAt.current = null;
+
     setLevelFeedback(null);
 
     if (
       currentLevelIndex ===
       levels.length - 1
     ) {
+      logEvent("game_complete", {
+        model: selectedLLM,
+        score: scoreRef.current,
+        duration_ms: msSinceRunStart(),
+      });
+
       onGameComplete(
         scoreRef.current
       );
@@ -176,6 +235,17 @@ export default function GameScreen({
   }
 
   function restartGame() {
+    logEvent("restart", {
+      ...levelLogFields(
+        selectedLLM,
+        levels[currentLevelIndex],
+        currentLevelIndex
+      ),
+      score: scoreRef.current,
+    });
+
+    startRun("restart");
+
     scoreRef.current = 0;
 
     setScore(0);
@@ -191,6 +261,19 @@ export default function GameScreen({
         selectedLLM
       )
     );
+  }
+
+  function exitGame() {
+    logEvent("exit", {
+      ...levelLogFields(
+        selectedLLM,
+        levels[currentLevelIndex],
+        currentLevelIndex
+      ),
+      score: scoreRef.current,
+    });
+
+    onBack();
   }
 
   useEffect(() => {
@@ -249,6 +332,40 @@ export default function GameScreen({
       y: 0,
       angle: -Math.PI / 2,
     };
+
+    /*
+     * Research stats for this level.
+     * level_start is logged on the first game-loop
+     * frame so dev Strict Mode can't double-log it.
+     */
+    const logFields = levelLogFields(
+      selectedLLM,
+      levelData,
+      currentLevelIndex
+    );
+
+    const scoreAtLevelStart =
+      scoreRef.current;
+
+    let levelStartedAt: number | null =
+      null;
+
+    const stats = {
+      shotsFired: 0,
+      shotsHit: 0,
+      correct: 0,
+      wrongOrder: 0,
+      distractor: 0,
+      crashes: 0,
+      wrongTokens: [] as string[],
+      wrongOrderTokens: [] as string[],
+    };
+
+    function timeInLevel() {
+      return levelStartedAt === null
+        ? 0
+        : Date.now() - levelStartedAt;
+    }
 
     /*
      * Damage feedback timers (seconds left).
@@ -522,6 +639,8 @@ export default function GameScreen({
         radius: 5,
       });
 
+      stats.shotsFired += 1;
+
       audioManager.play(
         "shoot"
       );
@@ -531,7 +650,11 @@ export default function GameScreen({
      * Finish level.
      */
     function finishLevel(
-      success: boolean
+      success: boolean,
+      reason:
+        | "completed"
+        | "time_up"
+        | "out_of_lives"
     ) {
       if (
         levelStatus !==
@@ -580,6 +703,46 @@ export default function GameScreen({
         verified:
           levelData.verified,
       });
+
+      const destroyed =
+        stats.correct +
+        stats.wrongOrder +
+        stats.distractor;
+
+      logEvent("level_end", {
+        ...logFields,
+        result: reason,
+        time_in_level_ms: timeInLevel(),
+        time_left_s: secondsRemaining,
+        lives_left: livesRemaining,
+        score: scoreRef.current,
+        level_points:
+          scoreRef.current -
+          scoreAtLevelStart,
+        shots_fired: stats.shotsFired,
+        shots_hit: stats.shotsHit,
+        aim_accuracy: ratio(
+          stats.shotsHit,
+          stats.shotsFired
+        ),
+        tokens_correct: stats.correct,
+        tokens_wrong_order:
+          stats.wrongOrder,
+        tokens_distractor:
+          stats.distractor,
+        concept_accuracy: ratio(
+          stats.correct,
+          destroyed
+        ),
+        crashes: stats.crashes,
+        wrong_tokens_shot:
+          stats.wrongTokens.join(" | "),
+        wrong_order_tokens:
+          stats.wrongOrderTokens.join(" | "),
+      });
+
+      feedbackOpenedAt.current =
+        Date.now();
     }
 
     /*
@@ -626,7 +789,10 @@ export default function GameScreen({
           "gameOver"
         );
 
-        finishLevel(false);
+        finishLevel(
+          false,
+          "out_of_lives"
+        );
       } else {
         audioManager.play(
           "wrong"
@@ -711,6 +877,15 @@ export default function GameScreen({
           "Ouch! Your ship crashed into an asteroid. Steer clear!"
         );
 
+        stats.crashes += 1;
+
+        logEvent("crash", {
+          ...logFields,
+          token: asteroid.token,
+          time_in_level_ms: timeInLevel(),
+          lives_left: livesRemaining - 1,
+        });
+
         loseLife();
 
         return;
@@ -748,6 +923,15 @@ export default function GameScreen({
           ...selected,
         ]);
 
+        stats.correct += 1;
+
+        logEvent("token_destroyed", {
+          ...logFields,
+          token: asteroid.token,
+          result: "correct",
+          time_in_level_ms: timeInLevel(),
+        });
+
         scoreRef.current +=
           100;
 
@@ -775,7 +959,10 @@ export default function GameScreen({
             "levelComplete"
           );
 
-          finishLevel(true);
+          finishLevel(
+            true,
+            "completed"
+          );
         } else {
           audioManager.play(
             "correct"
@@ -807,6 +994,28 @@ export default function GameScreen({
         futureTokens.includes(
           asteroid.token
         );
+
+      if (isCorrectButTooEarly) {
+        stats.wrongOrder += 1;
+        stats.wrongOrderTokens.push(
+          asteroid.token
+        );
+      } else {
+        stats.distractor += 1;
+        stats.wrongTokens.push(
+          asteroid.token
+        );
+      }
+
+      logEvent("token_destroyed", {
+        ...logFields,
+        token: asteroid.token,
+        result: isCorrectButTooEarly
+          ? "wrong_order"
+          : "distractor",
+        time_in_level_ms: timeInLevel(),
+        lives_left: livesRemaining - 1,
+      });
 
       /*
        * All incorrect actions lose
@@ -1301,6 +1510,18 @@ export default function GameScreen({
 
       if (
         initialized &&
+        levelStartedAt === null
+      ) {
+        levelStartedAt = Date.now();
+
+        logEvent(
+          "level_start",
+          logFields
+        );
+      }
+
+      if (
+        initialized &&
         levelStatus ===
           "playing"
       ) {
@@ -1345,7 +1566,10 @@ export default function GameScreen({
               "gameOver"
             );
 
-            finishLevel(false);
+            finishLevel(
+              false,
+              "time_up"
+            );
           }
         }
 
@@ -1575,6 +1799,8 @@ export default function GameScreen({
                 i,
                 1
               );
+
+              stats.shotsHit += 1;
 
               /*
                * Damage asteroid.
@@ -1986,7 +2212,7 @@ export default function GameScreen({
 
           <button
             type="button"
-            onClick={onBack}
+            onClick={exitGame}
             className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-bold hover:bg-slate-600"
           >
             ← EXIT

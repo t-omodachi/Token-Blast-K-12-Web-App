@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { logEvent, msSince } from "@/lib/researchLog";
+
 type InstructionsScreenProps = {
   onBack: () => void;
   onStart: () => void;
@@ -49,6 +51,43 @@ export default function InstructionsScreen({
 
   const crawlRef =
     useRef<HTMLDivElement>(null);
+
+  // When the briefing appeared (research timing)
+  const shownAt = useRef(0);
+
+  useEffect(() => {
+    shownAt.current = Date.now();
+  }, []);
+
+  function changeSpeed(option: number) {
+    setSpeed(option);
+
+    logEvent("briefing_speed", {
+      detail: `${option}x`,
+      duration_ms: msSince(shownAt.current),
+    });
+  }
+
+  function leave(
+    action: "start" | "back"
+  ) {
+    logEvent("briefing_end", {
+      result:
+        action === "back"
+          ? "back"
+          : crawlDone
+            ? "finished"
+            : "skipped",
+      duration_ms: msSince(shownAt.current),
+      detail: `speed ${speed}x`,
+    });
+
+    if (action === "back") {
+      onBack();
+    } else {
+      onStart();
+    }
+  }
 
   /*
    * Apply the multiplier to the running CSS
@@ -184,7 +223,7 @@ export default function InstructionsScreen({
               key={option}
               type="button"
               aria-pressed={speed === option}
-              onClick={() => setSpeed(option)}
+              onClick={() => changeSpeed(option)}
               className={`rounded-md px-3 py-1 text-sm font-black transition ${
                 speed === option
                   ? "bg-yellow-300 text-slate-950"
@@ -202,7 +241,7 @@ export default function InstructionsScreen({
 
         <button
           type="button"
-          onClick={onBack}
+          onClick={() => leave("back")}
           className="whitespace-nowrap rounded-xl border-2 border-slate-400 bg-slate-800/90 px-5 py-3 text-lg font-black transition hover:bg-slate-700 sm:px-6"
         >
           ← BACK
@@ -210,7 +249,7 @@ export default function InstructionsScreen({
 
         <button
           type="button"
-          onClick={onStart}
+          onClick={() => leave("start")}
           className="whitespace-nowrap rounded-xl border-4 border-green-300 bg-green-500 px-6 py-3 sm:px-10 text-xl font-black tracking-widest shadow-[0_6px_0_#166534] transition hover:scale-105 hover:bg-green-400 active:translate-y-1"
         >
           {crawlDone

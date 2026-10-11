@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import TitleScreen from "@/components/TitleScreen";
 import InstructionsScreen from "@/components/InstructionsScreen";
@@ -9,7 +9,13 @@ import DemoScreen from "@/components/DemoScreen";
 import GameScreen from "@/components/GameScreen";
 import ResultsScreen from "@/components/ResultsScreen";
 import LeaderboardScreen from "@/components/LeaderboardScreen";
+import ResearcherPanel from "@/components/ResearcherPanel";
 import type { ScoreEntry } from "@/lib/leaderboard";
+import {
+  logEvent,
+  startRun,
+  startSession,
+} from "@/lib/researchLog";
 
 type Screen =
   | "title"
@@ -39,16 +45,28 @@ export default function Home() {
   const [savedEntry, setSavedEntry] =
     useState<ScoreEntry | null>(null);
 
+  // Research log: session start on page load
+  useEffect(() => {
+    startSession();
+  }, []);
+
+  // Change screens and log it (research timing)
+  function go(next: Screen) {
+    setScreen(next);
+    logEvent("screen_view", { screen: next });
+  }
+
   function chooseLLM(model: LLM) {
     setSelectedLLM(model);
-    setScreen("demo");
+    logEvent("model_selected", { model });
+    go("demo");
   }
 
   function goToMainMenu() {
     setFinalScore(0);
     setSavedEntry(null);
     setSelectedLLM(null);
-    setScreen("title");
+    go("title");
   }
 
   return (
@@ -56,9 +74,10 @@ export default function Home() {
       {/* TITLE SCREEN */}
       {screen === "title" && (
         <TitleScreen
-          onPlay={() =>
-            setScreen("instructions")
-          }
+          onPlay={() => {
+            startRun("play");
+            go("instructions");
+          }}
         />
       )}
 
@@ -66,10 +85,10 @@ export default function Home() {
       {screen === "instructions" && (
         <InstructionsScreen
           onBack={() =>
-            setScreen("title")
+            go("title")
           }
           onStart={() =>
-            setScreen("model-select")
+            go("model-select")
           }
         />
       )}
@@ -79,7 +98,7 @@ export default function Home() {
         <ModelSelectScreen
           onSelect={chooseLLM}
           onBack={() =>
-            setScreen("title")
+            go("title")
           }
         />
       )}
@@ -90,10 +109,10 @@ export default function Home() {
           <DemoScreen
             selectedLLM={selectedLLM}
             onComplete={() =>
-              setScreen("game")
+              go("game")
             }
             onBack={() =>
-              setScreen("model-select")
+              go("model-select")
             }
           />
         )}
@@ -104,12 +123,12 @@ export default function Home() {
           <GameScreen
             selectedLLM={selectedLLM}
             onBack={() =>
-              setScreen("model-select")
+              go("model-select")
             }
             onGameComplete={(score) => {
               setFinalScore(score);
               setSavedEntry(null);
-              setScreen("results");
+              go("results");
             }}
           />
         )}
@@ -122,16 +141,22 @@ export default function Home() {
             model={selectedLLM}
             savedEntry={savedEntry}
             onSaved={(entry) => {
+              // Initials are not logged (anonymous data)
+              logEvent("score_saved", {
+                model: selectedLLM,
+                score: entry.score,
+              });
               setSavedEntry(entry);
-              setScreen("leaderboard");
+              go("leaderboard");
             }}
             onViewLeaderboard={() =>
-              setScreen("leaderboard")
+              go("leaderboard")
             }
             onPlayAgain={() => {
+              startRun("play_again");
               setFinalScore(0);
               setSavedEntry(null);
-              setScreen("model-select");
+              go("model-select");
             }}
             onMainMenu={goToMainMenu}
           />
@@ -143,11 +168,14 @@ export default function Home() {
           initialModel={selectedLLM}
           highlightId={savedEntry?.id}
           onBack={() =>
-            setScreen("results")
+            go("results")
           }
           onMainMenu={goToMainMenu}
         />
       )}
+
+      {/* Hidden researcher tools (Ctrl+Shift+L or #researcher) */}
+      <ResearcherPanel />
     </>
   );
 }

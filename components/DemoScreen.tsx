@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { audioManager } from "@/lib/audioManager";
 import { STARS } from "@/lib/starfield";
+import { logEvent } from "@/lib/researchLog";
 
 type LLM = "chatgpt" | "gemini" | "claude";
 
@@ -57,6 +58,13 @@ export default function DemoScreen({
 
   const [selectedTokens, setSelectedTokens] =
     useState<string[]>([]);
+
+  // When the demo appeared (research timing)
+  const shownAt = useRef(0);
+
+  useEffect(() => {
+    shownAt.current = Date.now();
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -757,6 +765,27 @@ export default function DemoScreen({
       ? "Gemini"
       : "Claude";
 
+  /*
+   * Research log: time in the demo and how it ended
+   * (finished, skipped, or went back to change AI).
+   */
+  function leaveDemo(
+    result: "completed" | "skipped" | "back"
+  ) {
+    logEvent("demo_end", {
+      model: selectedLLM,
+      result,
+      duration_ms: Date.now() - shownAt.current,
+      detail: `stage ${stage}`,
+    });
+
+    if (result === "back") {
+      onBack();
+    } else {
+      onComplete();
+    }
+  }
+
   return (
     <main className="h-screen overflow-hidden bg-[#050816] px-4 py-4 text-white">
 
@@ -853,7 +882,7 @@ export default function DemoScreen({
 
                 <button
                   type="button"
-                  onClick={onComplete}
+                  onClick={() => leaveDemo("completed")}
                   className="mt-7 rounded-xl bg-green-500 px-10 py-4 text-xl font-black tracking-wider hover:bg-green-400"
                 >
                   BEGIN MISSION →
@@ -883,7 +912,7 @@ export default function DemoScreen({
 
           <button
             type="button"
-            onClick={onBack}
+            onClick={() => leaveDemo("back")}
             className="justify-self-start whitespace-nowrap rounded-lg bg-slate-700 px-4 py-3 font-bold hover:bg-slate-600 sm:order-1 sm:px-6"
           >
             ← CHANGE AI
@@ -893,7 +922,7 @@ export default function DemoScreen({
             {stage !== "complete" && (
               <button
                 type="button"
-                onClick={onComplete}
+                onClick={() => leaveDemo("skipped")}
                 className="whitespace-nowrap rounded-lg border-2 border-green-300/70 bg-green-600 px-4 py-3 font-black tracking-wider transition hover:bg-green-500 sm:px-6"
               >
                 SKIP TRAINING →
