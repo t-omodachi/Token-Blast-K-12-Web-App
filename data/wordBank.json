@@ -10,6 +10,10 @@
   { "word": "cats", "difficulty": 1 },
   { "word": "jumped", "difficulty": 1 },
   { "word": "fastest", "difficulty": 1 },
+  { "word": "crab", "difficulty": 1 },
+  { "word": "pillow", "difficulty": 1 },
+  { "word": "waffle", "difficulty": 1 },
+  { "word": "rocket", "difficulty": 1 },
 
   { "word": "raccoon", "difficulty": 2 },
   { "word": "unlucky", "difficulty": 2 },
@@ -21,6 +25,14 @@
   { "word": "unhappy", "difficulty": 2 },
   { "word": "teacher", "difficulty": 2 },
   { "word": "superhero", "difficulty": 2 },
+  { "word": "pumpkin", "difficulty": 2 },
+  { "word": "mermaid", "difficulty": 2 },
+  { "word": "lollipop", "difficulty": 2 },
+  { "word": "champion", "difficulty": 2 },
+  { "word": "raspberry", "difficulty": 2 },
+  { "word": "starlight", "difficulty": 2 },
+  { "word": "popcorn", "difficulty": 2 },
+  { "word": "sunflower", "difficulty": 2 },
 
   { "word": "recycling", "difficulty": 3 },
   { "word": "watermelon", "difficulty": 3 },
@@ -30,5 +42,13 @@
   { "word": "gingerbread", "difficulty": 3 },
   { "word": "unbelievable", "difficulty": 3 },
   { "word": "earthquake", "difficulty": 3 },
-  { "word": "extraordinary", "difficulty": 3 }
+  { "word": "extraordinary", "difficulty": 3 },
+  { "word": "atmosphere", "difficulty": 3 },
+  { "word": "camouflage", "difficulty": 3 },
+  { "word": "vocabulary", "difficulty": 3 },
+  { "word": "carnivore", "difficulty": 3 },
+  { "word": "herbivore", "difficulty": 3 },
+  { "word": "grasshopper", "difficulty": 3 },
+  { "word": "underwater", "difficulty": 3 },
+  { "word": "unpredictable", "difficulty": 3 }
 ]

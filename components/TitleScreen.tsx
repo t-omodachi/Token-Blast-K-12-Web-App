@@ -15,7 +15,7 @@ export default function TitleScreen({ onPlay }: TitleScreenProps) {
   }, []);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-black text-white">
+    <main className="relative min-h-screen overflow-hidden bg-[#050816] text-white">
 
       {/* Star background */}
       <div
