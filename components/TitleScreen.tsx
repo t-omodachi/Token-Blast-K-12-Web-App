@@ -1,9 +1,19 @@
+import { useEffect } from "react";
+import { audioManager } from "@/lib/audioManager";
 
 type TitleScreenProps = {
   onPlay: () => void;
 };
 
 export default function TitleScreen({ onPlay }: TitleScreenProps) {
+  useEffect(() => {
+    audioManager.play("title");
+
+    return () => {
+      audioManager.stop("title");
+    };
+  }, []);
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-black text-white">
 

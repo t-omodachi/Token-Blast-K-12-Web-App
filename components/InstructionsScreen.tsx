@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { audioManager } from "@/lib/audioManager";
 import { logEvent, msSince } from "@/lib/researchLog";
 
 type InstructionsScreenProps = {
@@ -57,6 +58,11 @@ export default function InstructionsScreen({
 
   useEffect(() => {
     shownAt.current = Date.now();
+    audioManager.play("crawl");
+
+    return () => {
+      audioManager.stop("crawl");
+    };
   }, []);
 
   function changeSpeed(option: number) {

@@ -171,6 +171,20 @@ export default function GameScreen({
   const modelName =
     getModelName(selectedLLM);
 
+  // Play battle music during active gameplay, stop when the feedback popup appears
+  useEffect(() => {
+    if (levelFeedback) {
+      audioManager.stop("battle");
+      return;
+    }
+
+    audioManager.play("battle");
+
+    return () => {
+      audioManager.stop("battle");
+    };
+  }, [levelFeedback, currentLevelIndex]);
+
   /*
    * Reset the HUD for a fresh level.
    */
@@ -666,6 +680,8 @@ export default function GameScreen({
       levelStatus =
         "finished";
 
+      audioManager.stop("battle");
+
       if (success) {
         const completionBonus =
           250;
@@ -781,6 +797,8 @@ export default function GameScreen({
         y: ship.y - 30,
         age: 0,
       });
+
+      audioManager.play("damage");
 
       if (
         livesRemaining === 0
@@ -1818,6 +1836,8 @@ export default function GameScreen({
                 asteroid.health <=
                 0
               ) {
+                audioManager.play("explosion");
+
                 const outcome =
                   asteroidDestroyed(
                     asteroid

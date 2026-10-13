@@ -512,6 +512,7 @@ export default function DemoScreen({
       }
 
       asteroid.alive = false;
+      audioManager.play("explosion");
 
       if (asteroid.token === "play") {
         setSelectedTokens(["play"]);
