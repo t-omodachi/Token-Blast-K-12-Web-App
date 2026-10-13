@@ -1,6 +1,11 @@
 import Starfield from "./Starfield";
 
-type LLM = "chatgpt" | "gemini" | "claude";
+import {
+  getModelName,
+  type LLM,
+} from "@/lib/gameLevels";
+
+import { MODEL_STYLES } from "@/lib/modelStyles";
 
 type ModelSelectScreenProps = {
   onSelect: (model: LLM) => void;
@@ -9,43 +14,31 @@ type ModelSelectScreenProps = {
 
 /*
  * Each AI is drawn as its own planet.
- * Planet looks live in globals.css (.planet-*).
- * Full class strings so Tailwind can see them.
+ * Planet looks live in globals.css (.planet-*),
+ * colors in lib/modelStyles.ts.
  */
 const PLANETS: {
   model: LLM;
-  name: string;
   description: string;
-  text: string;
-  focus: string;
   ring?: boolean;
   moon?: boolean;
 }[] = [
   {
     model: "chatgpt",
-    name: "ChatGPT",
     description:
-      "Explore how the tokenizer associated with the ChatGPT version used by the game breaks words into pieces.",
-    text: "text-emerald-300",
-    focus: "focus-visible:outline-emerald-300",
+      "OpenAI's popular chatbot. See how ChatGPT's tokenizer breaks words into pieces.",
     moon: true,
   },
   {
-    model: "gemini",
-    name: "Gemini",
+    model: "gemma",
     description:
-      "See how the Gemini tokenizer used by the game divides the same kinds of words into tokens.",
-    text: "text-blue-300",
-    focus: "focus-visible:outline-blue-300",
+      "Google's open AI model. See how Gemma splits the same words into tokens.",
     ring: true,
   },
   {
-    model: "claude",
-    name: "Claude",
+    model: "llama",
     description:
-      "Compare how the Claude tokenizer represented by the game divides words into useful pieces.",
-    text: "text-orange-300",
-    focus: "focus-visible:outline-orange-300",
+      "Meta's open AI model. Compare how Llama divides words into pieces.",
     moon: true,
   },
 ];
@@ -55,11 +48,11 @@ export default function ModelSelectScreen({
   onBack,
 }: ModelSelectScreenProps) {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#050816] px-6 py-6 text-white">
+    <main className="relative min-h-screen overflow-hidden bg-[#050816] px-6 pb-12 pt-4 text-white">
 
       <Starfield />
 
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-3rem)] max-w-6xl flex-col items-center justify-center">
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl flex-col items-center justify-center">
 
         {/* Heading */}
         <header className="mb-2 text-center">
@@ -85,7 +78,7 @@ export default function ModelSelectScreen({
               key={planet.model}
               type="button"
               onClick={() => onSelect(planet.model)}
-              className={`group flex flex-col items-center rounded-3xl p-2 text-center focus-visible:outline-4 ${planet.focus}`}
+              className={`group flex flex-col items-center rounded-3xl p-2 text-center focus-visible:outline-4 ${MODEL_STYLES[planet.model].focus}`}
             >
               <div
                 aria-hidden="true"
@@ -108,8 +101,8 @@ export default function ModelSelectScreen({
                 )}
               </div>
 
-              <h2 className={`text-3xl font-black ${planet.text}`}>
-                {planet.name}
+              <h2 className={`text-3xl font-black ${MODEL_STYLES[planet.model].text}`}>
+                {getModelName(planet.model)}
               </h2>
 
               <p className="mt-2 max-w-sm text-sm text-slate-300">
@@ -117,7 +110,7 @@ export default function ModelSelectScreen({
               </p>
 
               <p
-                className={`mt-3 font-bold tracking-widest opacity-70 transition group-hover:opacity-100 group-focus-visible:opacity-100 ${planet.text}`}
+                className={`mt-3 font-bold tracking-widest opacity-70 transition group-hover:opacity-100 group-focus-visible:opacity-100 ${MODEL_STYLES[planet.model].text}`}
               >
                 LAND HERE →
               </p>
@@ -136,6 +129,14 @@ export default function ModelSelectScreen({
         </button>
 
       </div>
+
+      {/* Trademark disclaimer: pinned to the bottom, small and quiet on purpose */}
+      <p className="absolute inset-x-0 bottom-2 z-10 mx-auto max-w-2xl px-6 text-center text-[11px] leading-snug text-slate-500">
+        Token Blast is a student project and is not affiliated with or
+        endorsed by OpenAI, Google, or Meta. ChatGPT, Gemma, and Llama are
+        trademarks of their respective owners. Token splits come from each
+        model&apos;s public tokenizer.
+      </p>
     </main>
   );
 }

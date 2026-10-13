@@ -10,6 +10,8 @@ import GameScreen from "@/components/GameScreen";
 import ResultsScreen from "@/components/ResultsScreen";
 import LeaderboardScreen from "@/components/LeaderboardScreen";
 import ResearcherPanel from "@/components/ResearcherPanel";
+import ParticipantBadge from "@/components/ParticipantBadge";
+import type { LLM } from "@/lib/gameLevels";
 import type { ScoreEntry } from "@/lib/leaderboard";
 import {
   logEvent,
@@ -25,11 +27,6 @@ type Screen =
   | "game"
   | "results"
   | "leaderboard";
-
-type LLM =
-  | "chatgpt"
-  | "gemini"
-  | "claude";
 
 export default function Home() {
   const [screen, setScreen] =
@@ -50,23 +47,17 @@ export default function Home() {
     startSession();
   }, []);
 
-  // Change screens and log it (research timing)
-  function go(next: Screen) {
-    setScreen(next);
-    logEvent("screen_view", { screen: next });
-  }
-
   function chooseLLM(model: LLM) {
     setSelectedLLM(model);
     logEvent("model_selected", { model });
-    go("demo");
+    setScreen("demo");
   }
 
   function goToMainMenu() {
     setFinalScore(0);
     setSavedEntry(null);
     setSelectedLLM(null);
-    go("title");
+    setScreen("title");
   }
 
   return (
@@ -76,7 +67,7 @@ export default function Home() {
         <TitleScreen
           onPlay={() => {
             startRun("play");
-            go("instructions");
+            setScreen("instructions");
           }}
         />
       )}
@@ -85,10 +76,10 @@ export default function Home() {
       {screen === "instructions" && (
         <InstructionsScreen
           onBack={() =>
-            go("title")
+            setScreen("title")
           }
           onStart={() =>
-            go("model-select")
+            setScreen("model-select")
           }
         />
       )}
@@ -98,7 +89,7 @@ export default function Home() {
         <ModelSelectScreen
           onSelect={chooseLLM}
           onBack={() =>
-            go("title")
+            setScreen("title")
           }
         />
       )}
@@ -109,10 +100,10 @@ export default function Home() {
           <DemoScreen
             selectedLLM={selectedLLM}
             onComplete={() =>
-              go("game")
+              setScreen("game")
             }
             onBack={() =>
-              go("model-select")
+              setScreen("model-select")
             }
           />
         )}
@@ -123,12 +114,12 @@ export default function Home() {
           <GameScreen
             selectedLLM={selectedLLM}
             onBack={() =>
-              go("model-select")
+              setScreen("model-select")
             }
             onGameComplete={(score) => {
               setFinalScore(score);
               setSavedEntry(null);
-              go("results");
+              setScreen("results");
             }}
           />
         )}
@@ -141,22 +132,17 @@ export default function Home() {
             model={selectedLLM}
             savedEntry={savedEntry}
             onSaved={(entry) => {
-              // Initials are not logged (anonymous data)
-              logEvent("score_saved", {
-                model: selectedLLM,
-                score: entry.score,
-              });
               setSavedEntry(entry);
-              go("leaderboard");
+              setScreen("leaderboard");
             }}
             onViewLeaderboard={() =>
-              go("leaderboard")
+              setScreen("leaderboard")
             }
             onPlayAgain={() => {
               startRun("play_again");
               setFinalScore(0);
               setSavedEntry(null);
-              go("model-select");
+              setScreen("model-select");
             }}
             onMainMenu={goToMainMenu}
           />
@@ -168,11 +154,14 @@ export default function Home() {
           initialModel={selectedLLM}
           highlightId={savedEntry?.id}
           onBack={() =>
-            go("results")
+            setScreen("results")
           }
           onMainMenu={goToMainMenu}
         />
       )}
+
+      {/* Participant ID, faint in the top-left on every screen */}
+      <ParticipantBadge />
 
       {/* Hidden researcher tools (Ctrl+Shift+L or #researcher) */}
       <ResearcherPanel />

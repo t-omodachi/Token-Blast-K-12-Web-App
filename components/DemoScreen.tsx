@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { audioManager } from "@/lib/audioManager";
 import { STARS } from "@/lib/starfield";
+import { drawShip } from "@/lib/drawShip";
 import { logEvent } from "@/lib/researchLog";
-
-type LLM = "chatgpt" | "gemini" | "claude";
+import { getModelName, type LLM } from "@/lib/gameLevels";
 
 type DemoScreenProps = {
   selectedLLM: LLM;
@@ -17,8 +17,8 @@ type DemoScreenProps = {
 type TutorialStage =
   | "move"
   | "aim"
-  | "shootPlay"
-  | "shootIng"
+  | "shootFirst"
+  | "shootSecond"
   | "complete";
 
 type Asteroid = {
@@ -38,6 +38,15 @@ type Bullet = {
   vy: number;
   radius: number;
 };
+
+/*
+ * Training word. Every AI in the game (ChatGPT, Gemma, Llama)
+ * splits it the same way, so the tutorial is true whichever
+ * one the student picked. It's kept out of the word bank so
+ * it doesn't repeat as a real level.
+ */
+const DEMO_WORD = "interstellar";
+const [FIRST_TOKEN, SECOND_TOKEN] = ["inter", "stellar"];
 
 const SHIP_SPEED = 250;
 const BULLET_SPEED = 650;
@@ -113,7 +122,7 @@ export default function DemoScreen({
       asteroids = [
         {
           id: 1,
-          token: "play",
+          token: FIRST_TOKEN,
           x: width * 0.35,
           y: height * 0.3,
           radius: 48,
@@ -122,7 +131,7 @@ export default function DemoScreen({
         },
         {
           id: 2,
-          token: "ing",
+          token: SECOND_TOKEN,
           x: width * 0.65,
           y: height * 0.38,
           radius: 48,
@@ -197,16 +206,16 @@ export default function DemoScreen({
         mouseMovement > 100
       ) {
         changeStage(
-          "shootPlay",
-          'Great! Now aim at the asteroid labeled "play" and click to fire.'
+          "shootFirst",
+          `Great! Now aim at the asteroid labeled "${FIRST_TOKEN}" and click to fire.`
         );
       }
     }
 
     function shoot(event: PointerEvent) {
       if (
-        currentStage !== "shootPlay" &&
-        currentStage !== "shootIng"
+        currentStage !== "shootFirst" &&
+        currentStage !== "shootSecond"
       ) {
         return;
       }
@@ -229,56 +238,6 @@ export default function DemoScreen({
       });
 
       audioManager.play("shoot");
-    }
-
-    function drawShip() {
-      ctx!.save();
-
-      ctx!.translate(ship.x, ship.y);
-      ctx!.rotate(ship.angle);
-
-      // Engine flame
-      ctx!.fillStyle = "#fb923c";
-
-      ctx!.beginPath();
-      ctx!.moveTo(-14, -7);
-      ctx!.lineTo(-31, 0);
-      ctx!.lineTo(-14, 7);
-      ctx!.closePath();
-      ctx!.fill();
-
-      // Ship
-      ctx!.fillStyle = "#22d3ee";
-      ctx!.strokeStyle = "white";
-      ctx!.lineWidth = 2;
-
-      ctx!.beginPath();
-      ctx!.moveTo(26, 0);
-      ctx!.lineTo(-17, -15);
-      ctx!.lineTo(-9, 0);
-      ctx!.lineTo(-17, 15);
-      ctx!.closePath();
-
-      ctx!.fill();
-      ctx!.stroke();
-
-      // Cockpit
-      ctx!.fillStyle = "#1e3a8a";
-
-      ctx!.beginPath();
-      ctx!.ellipse(
-        3,
-        0,
-        10,
-        6,
-        0,
-        0,
-        Math.PI * 2
-      );
-
-      ctx!.fill();
-
-      ctx!.restore();
     }
 
     function drawAsteroid(asteroid: Asteroid) {
@@ -497,9 +456,9 @@ export default function DemoScreen({
       asteroid: Asteroid
     ) {
       const expectedToken =
-        currentStage === "shootPlay"
-          ? "play"
-          : "ing";
+        currentStage === "shootFirst"
+          ? FIRST_TOKEN
+          : SECOND_TOKEN;
 
       if (asteroid.token !== expectedToken) {
         asteroid.flash = 0.4;
@@ -514,22 +473,22 @@ export default function DemoScreen({
       asteroid.alive = false;
       audioManager.play("explosion");
 
-      if (asteroid.token === "play") {
-        setSelectedTokens(["play"]);
+      if (asteroid.token === FIRST_TOKEN) {
+        setSelectedTokens([FIRST_TOKEN]);
 
         changeStage(
-          "shootIng",
-          'Excellent! "play" is our first token. Now destroy the asteroid labeled "ing".'
+          "shootSecond",
+          `Excellent! "${FIRST_TOKEN}" is our first token. Now destroy the asteroid labeled "${SECOND_TOKEN}".`
         );
       } else {
         setSelectedTokens([
-          "play",
-          "ing",
+          FIRST_TOKEN,
+          SECOND_TOKEN,
         ]);
 
         changeStage(
           "complete",
-          'Great job! "play" + "ing" rebuilds the word "playing". Training complete!'
+          `Great job! "${FIRST_TOKEN}" + "${SECOND_TOKEN}" rebuilds the word "${DEMO_WORD}". Training complete!`
         );
       }
     }
@@ -677,7 +636,7 @@ export default function DemoScreen({
         drawBullet(bullet);
       }
 
-      drawShip();
+      drawShip(ctx!, ship.x, ship.y, ship.angle);
       drawCrosshair();
 
       animationFrame =
@@ -760,11 +719,7 @@ export default function DemoScreen({
   }, []);
 
   const modelName =
-    selectedLLM === "chatgpt"
-      ? "ChatGPT"
-      : selectedLLM === "gemini"
-      ? "Gemini"
-      : "Claude";
+    getModelName(selectedLLM);
 
   /*
    * Research log: time in the demo and how it ended
@@ -824,8 +779,8 @@ export default function DemoScreen({
             TRAINING WORD
           </p>
 
-          <h2 className="text-4xl font-black text-yellow-300">
-            PLAYING
+          <h2 className="text-4xl font-black uppercase text-yellow-300">
+            {DEMO_WORD}
           </h2>
 
         </section>
@@ -861,12 +816,12 @@ export default function DemoScreen({
                   TRAINING COMPLETE
                 </p>
 
-                <h2 className="mt-3 text-4xl font-black text-yellow-300">
-                  PLAY + ING
+                <h2 className="mt-3 text-4xl font-black uppercase text-yellow-300">
+                  {FIRST_TOKEN} + {SECOND_TOKEN}
                 </h2>
 
-                <p className="mt-3 text-2xl font-black">
-                  = PLAYING
+                <p className="mt-3 text-2xl font-black uppercase">
+                  = {DEMO_WORD}
                 </p>
 
                 <p className="mt-6 text-slate-300">
@@ -876,9 +831,10 @@ export default function DemoScreen({
                 </p>
 
                 <p className="mt-3 text-sm text-slate-400">
-                  The real levels will use
-                  tokenization data associated
-                  with {modelName}.
+                  All three AIs split &quot;{DEMO_WORD}&quot;
+                  the same way. In the real missions
+                  you&apos;ll blast {modelName}&apos;s own
+                  tokens, and the AIs don&apos;t always agree!
                 </p>
 
                 <button

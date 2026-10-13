@@ -6,9 +6,12 @@ import Starfield from "./Starfield";
 
 import {
   getModelName,
+  getShortModelName,
   MODELS,
   type LLM,
 } from "@/lib/gameLevels";
+
+import { MODEL_STYLES } from "@/lib/modelStyles";
 
 import {
   getScores,
@@ -23,31 +26,6 @@ type LeaderboardScreenProps = {
   highlightId?: string | null;
   onBack: () => void;
   onMainMenu: () => void;
-};
-
-/*
- * Full class strings so Tailwind can see them.
- * Colors match the model select cards.
- */
-const MODEL_STYLES: Record<
-  LLM,
-  { text: string; tab: string; badge: string }
-> = {
-  chatgpt: {
-    text: "text-emerald-300",
-    tab: "border-emerald-400 bg-emerald-500/20 text-emerald-300",
-    badge: "bg-emerald-500/20 text-emerald-300",
-  },
-  gemini: {
-    text: "text-blue-300",
-    tab: "border-blue-400 bg-blue-500/20 text-blue-300",
-    badge: "bg-blue-500/20 text-blue-300",
-  },
-  claude: {
-    text: "text-orange-300",
-    tab: "border-orange-400 bg-orange-500/20 text-orange-300",
-    badge: "bg-orange-500/20 text-orange-300",
-  },
 };
 
 // Gold, silver, bronze
@@ -152,10 +130,16 @@ export default function LeaderboardScreen({
                         <span className="hidden sm:block">
                           <span
                             className={`rounded-md px-2 py-1 text-xs font-bold ${
-                              MODEL_STYLES[entry.model].badge
+                              MODEL_STYLES[entry.model].badgeBg
                             }`}
                           >
-                            {getModelName(entry.model)}
+                            <span
+                              className={
+                                MODEL_STYLES[entry.model].text
+                              }
+                            >
+                              {getModelName(entry.model)}
+                            </span>
                           </span>
                         </span>
 
@@ -220,11 +204,19 @@ export default function LeaderboardScreen({
                       }
                       className={`rounded-lg border-2 px-2 py-2 text-sm font-black transition ${
                         active
-                          ? MODEL_STYLES[model].tab
+                          ? MODEL_STYLES[model].activeTab
                           : "border-slate-700 text-slate-400 hover:border-slate-500 hover:text-white"
                       }`}
                     >
-                      {getModelName(model)}
+                      <span
+                        className={
+                          active
+                            ? MODEL_STYLES[model].text
+                            : ""
+                        }
+                      >
+                        {getShortModelName(model)}
+                      </span>
                     </button>
                   );
                 })}

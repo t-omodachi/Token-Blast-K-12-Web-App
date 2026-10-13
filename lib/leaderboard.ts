@@ -1,4 +1,4 @@
-import type { LLM } from "./gameLevels";
+import { isModel, type LLM } from "./gameLevels";
 
 export type ScoreEntry = {
   id: string;
@@ -58,7 +58,10 @@ export function cleanInitials(value: string) {
 }
 
 export async function getScores(): Promise<ScoreEntry[]> {
-  return readAll().sort(byRank);
+  // Skips old scores from models no longer in the game (Gemini, Claude)
+  return readAll()
+    .filter((entry) => isModel(entry.model))
+    .sort(byRank);
 }
 
 export async function saveScore(

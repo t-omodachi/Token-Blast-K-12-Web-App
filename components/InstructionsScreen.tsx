@@ -65,15 +65,6 @@ export default function InstructionsScreen({
     };
   }, []);
 
-  function changeSpeed(option: number) {
-    setSpeed(option);
-
-    logEvent("briefing_speed", {
-      detail: `${option}x`,
-      duration_ms: msSince(shownAt.current),
-    });
-  }
-
   function leave(
     action: "start" | "back"
   ) {
@@ -173,7 +164,7 @@ export default function InstructionsScreen({
             <p>
               Fly with W A S D. Aim with your mouse.
               Click to fire. Each asteroid takes a few hits
-              to break.
+              to break. Stuck? Press HINT for a clue.
             </p>
 
             <h2 className="briefing-heading">
@@ -229,7 +220,7 @@ export default function InstructionsScreen({
               key={option}
               type="button"
               aria-pressed={speed === option}
-              onClick={() => changeSpeed(option)}
+              onClick={() => setSpeed(option)}
               className={`rounded-md px-3 py-1 text-sm font-black transition ${
                 speed === option
                   ? "bg-yellow-300 text-slate-950"

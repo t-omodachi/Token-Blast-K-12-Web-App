@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import FeedbackModal from "./FeedbackModal";
+import HintRobot from "./HintRobot";
 
 import {
   getLevelsForModel,
@@ -17,11 +18,11 @@ import {
 
 import { audioManager } from "@/lib/audioManager";
 import { STARS } from "@/lib/starfield";
+import { drawShip } from "@/lib/drawShip";
 
 import {
   logEvent,
   msSinceRunStart,
-  startRun,
 } from "@/lib/researchLog";
 
 /*
@@ -39,6 +40,30 @@ function levelLogFields(
     difficulty: level?.difficulty,
     correct_split: level?.correctTokens.join(" + "),
   };
+}
+
+/*
+ * Hint text for the current step. Updates live as tokens are
+ * found. Gives the shape of the answer, never the letters.
+ */
+function getHints(
+  modelName: string,
+  correctTokens: string[],
+  found: number
+) {
+  const total = correctTokens.length;
+  const next = correctTokens[found];
+
+  const countHint =
+    total === 1
+      ? `${modelName} uses just 1 token for this word.`
+      : `${modelName} uses ${total} tokens here (${found} found).`;
+
+  const lengthHint = next
+    ? `${total === 1 ? "That" : "Next"} token: ${next.length} letter${next.length === 1 ? "" : "s"}.`
+    : "You found every token!";
+
+  return [countHint, lengthHint];
 }
 
 // Ratio rounded to 3 decimals, blank when nothing to divide by
@@ -107,6 +132,9 @@ const DAMAGE_FLASH_TIME = 0.45;
 const SHAKE_TIME = 0.35;
 const POPUP_TIME = 1;
 
+// Hints per level: 1 = token count, 2 = length of the next token
+const MAX_HINTS = 2;
+
 export default function GameScreen({
   selectedLLM,
   onBack,
@@ -120,6 +148,9 @@ export default function GameScreen({
   // When the current feedback popup opened (research timing)
   const feedbackOpenedAt =
     useRef<number | null>(null);
+
+  // Research: hints used in the current level
+  const hintsUsedRef = useRef(0);
 
   const [currentLevelIndex, setCurrentLevelIndex] =
     useState(0);
@@ -147,6 +178,13 @@ export default function GameScreen({
       "Destroy the correct token asteroids in order!"
     );
 
+  // How many hints are revealed this level, and if the popup is open
+  const [hintsShown, setHintsShown] =
+    useState(0);
+
+  const [hintOpen, setHintOpen] =
+    useState(false);
+
   const [
     levelFeedback,
     setLevelFeedback,
@@ -155,10 +193,10 @@ export default function GameScreen({
   );
 
   /*
-   * Generate the five-level campaign.
-   * It is re-rolled when the player restarts.
+   * Generate the five-level campaign
+   * once when the game starts.
    */
-  const [levels, setLevels] =
+  const [levels] =
     useState(() =>
       getLevelsForModel(
         selectedLLM
@@ -200,6 +238,25 @@ export default function GameScreen({
     setMessage(
       "Destroy the correct token asteroids in order!"
     );
+
+    setHintsShown(0);
+    setHintOpen(false);
+    hintsUsedRef.current = 0;
+  }
+
+  /*
+   * HINT button: reveal the next hint (up to MAX_HINTS),
+   * or just reopen the popup once they're all shown.
+   */
+  function showHint() {
+    if (hintsShown < MAX_HINTS) {
+      const next = hintsShown + 1;
+
+      setHintsShown(next);
+      hintsUsedRef.current = next;
+    }
+
+    setHintOpen(true);
   }
 
   function continueGame() {
@@ -245,35 +302,6 @@ export default function GameScreen({
     setCurrentLevelIndex(
       (previous) =>
         previous + 1
-    );
-  }
-
-  function restartGame() {
-    logEvent("restart", {
-      ...levelLogFields(
-        selectedLLM,
-        levels[currentLevelIndex],
-        currentLevelIndex
-      ),
-      score: scoreRef.current,
-    });
-
-    startRun("restart");
-
-    scoreRef.current = 0;
-
-    setScore(0);
-
-    setCurrentLevelIndex(0);
-
-    setLevelFeedback(null);
-
-    resetLevelState();
-
-    setLevels(
-      getLevelsForModel(
-        selectedLLM
-      )
     );
   }
 
@@ -365,14 +393,9 @@ export default function GameScreen({
       null;
 
     const stats = {
-      shotsFired: 0,
-      shotsHit: 0,
       correct: 0,
       wrongOrder: 0,
       distractor: 0,
-      crashes: 0,
-      wrongTokens: [] as string[],
-      wrongOrderTokens: [] as string[],
     };
 
     function timeInLevel() {
@@ -653,8 +676,6 @@ export default function GameScreen({
         radius: 5,
       });
 
-      stats.shotsFired += 1;
-
       audioManager.play(
         "shoot"
       );
@@ -729,18 +750,10 @@ export default function GameScreen({
         ...logFields,
         result: reason,
         time_in_level_ms: timeInLevel(),
-        time_left_s: secondsRemaining,
-        lives_left: livesRemaining,
         score: scoreRef.current,
         level_points:
           scoreRef.current -
           scoreAtLevelStart,
-        shots_fired: stats.shotsFired,
-        shots_hit: stats.shotsHit,
-        aim_accuracy: ratio(
-          stats.shotsHit,
-          stats.shotsFired
-        ),
         tokens_correct: stats.correct,
         tokens_wrong_order:
           stats.wrongOrder,
@@ -750,11 +763,7 @@ export default function GameScreen({
           stats.correct,
           destroyed
         ),
-        crashes: stats.crashes,
-        wrong_tokens_shot:
-          stats.wrongTokens.join(" | "),
-        wrong_order_tokens:
-          stats.wrongOrderTokens.join(" | "),
+        hints_used: hintsUsedRef.current,
       });
 
       feedbackOpenedAt.current =
@@ -895,15 +904,6 @@ export default function GameScreen({
           "Ouch! Your ship crashed into an asteroid. Steer clear!"
         );
 
-        stats.crashes += 1;
-
-        logEvent("crash", {
-          ...logFields,
-          token: asteroid.token,
-          time_in_level_ms: timeInLevel(),
-          lives_left: livesRemaining - 1,
-        });
-
         loseLife();
 
         return;
@@ -942,13 +942,6 @@ export default function GameScreen({
         ]);
 
         stats.correct += 1;
-
-        logEvent("token_destroyed", {
-          ...logFields,
-          token: asteroid.token,
-          result: "correct",
-          time_in_level_ms: timeInLevel(),
-        });
 
         scoreRef.current +=
           100;
@@ -1015,25 +1008,9 @@ export default function GameScreen({
 
       if (isCorrectButTooEarly) {
         stats.wrongOrder += 1;
-        stats.wrongOrderTokens.push(
-          asteroid.token
-        );
       } else {
         stats.distractor += 1;
-        stats.wrongTokens.push(
-          asteroid.token
-        );
       }
-
-      logEvent("token_destroyed", {
-        ...logFields,
-        token: asteroid.token,
-        result: isCorrectButTooEarly
-          ? "wrong_order"
-          : "distractor",
-        time_in_level_ms: timeInLevel(),
-        lives_left: livesRemaining - 1,
-      });
 
       /*
        * All incorrect actions lose
@@ -1124,89 +1101,6 @@ export default function GameScreen({
           star.size
         );
       }
-    }
-
-    /*
-     * Ship.
-     */
-    function drawShip() {
-      ctx!.save();
-
-      ctx!.translate(
-        ship.x,
-        ship.y
-      );
-
-      ctx!.rotate(
-        ship.angle
-      );
-
-      /*
-       * Engine.
-       */
-      ctx!.fillStyle =
-        "#fb923c";
-
-      ctx!.beginPath();
-
-      ctx!.moveTo(
-        -14,
-        -7
-      );
-
-      ctx!.lineTo(
-        -30,
-        0
-      );
-
-      ctx!.lineTo(
-        -14,
-        7
-      );
-
-      ctx!.closePath();
-
-      ctx!.fill();
-
-      /*
-       * Ship body.
-       */
-      ctx!.fillStyle =
-        "#22d3ee";
-
-      ctx!.strokeStyle =
-        "#ffffff";
-
-      ctx!.lineWidth = 2;
-
-      ctx!.beginPath();
-
-      ctx!.moveTo(
-        25,
-        0
-      );
-
-      ctx!.lineTo(
-        -16,
-        -14
-      );
-
-      ctx!.lineTo(
-        -9,
-        0
-      );
-
-      ctx!.lineTo(
-        -16,
-        14
-      );
-
-      ctx!.closePath();
-
-      ctx!.fill();
-      ctx!.stroke();
-
-      ctx!.restore();
     }
 
     /*
@@ -1818,8 +1712,6 @@ export default function GameScreen({
                 1
               );
 
-              stats.shotsHit += 1;
-
               /*
                * Damage asteroid.
                */
@@ -1976,7 +1868,7 @@ export default function GameScreen({
         Math.floor(invulnerableTime * 10) % 2 === 0;
 
       if (!shipHidden) {
-        drawShip();
+        drawShip(ctx!, ship.x, ship.y, ship.angle);
       }
 
       drawDamagePopups();
@@ -2145,7 +2037,7 @@ export default function GameScreen({
         </header>
 
         {/* Target Word */}
-        <section className="shrink-0 py-2 text-center">
+        <section className="relative shrink-0 py-2 text-center">
 
           <p className="text-xs tracking-[0.25em] text-slate-300">
             TOKENIZING WITH{" "}
@@ -2177,6 +2069,42 @@ export default function GameScreen({
           <h1 className="text-3xl font-black uppercase text-yellow-300">
             {level.word}
           </h1>
+
+          {/* Hint popup: beside the word, never over the asteroids; game keeps running */}
+          {hintOpen && hintsShown > 0 && !levelFeedback && (
+            <div
+              role="status"
+              className="absolute right-0 top-1/2 max-w-sm -translate-y-1/2 rounded-xl border-2 border-yellow-300 bg-slate-950/90 px-3 py-2 shadow-[0_0_20px_rgba(253,224,71,.25)]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="flex items-center gap-1.5 text-xs font-bold tracking-widest text-yellow-300">
+                  <HintRobot className="h-5 w-5" />
+                  HINT {hintsShown}/{MAX_HINTS}
+                </p>
+
+                <button
+                  type="button"
+                  aria-label="Close hint"
+                  onClick={() => setHintOpen(false)}
+                  className="-mr-1 -mt-1 rounded px-1 text-slate-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <ul className="mt-0.5 space-y-0.5 text-left text-sm font-bold text-white">
+                {getHints(
+                  modelName,
+                  level.correctTokens,
+                  selectedTokens.length
+                )
+                  .slice(0, hintsShown)
+                  .map((hint) => (
+                    <li key={hint}>{hint}</li>
+                  ))}
+              </ul>
+            </div>
+          )}
 
         </section>
 
@@ -2228,12 +2156,12 @@ export default function GameScreen({
         </div>
 
         {/* Bottom HUD */}
-        <section className="mt-2 grid shrink-0 grid-cols-[auto_1fr_auto] items-center gap-4 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2">
+        <section className="mt-2 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2">
 
           <button
             type="button"
             onClick={exitGame}
-            className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-bold hover:bg-slate-600"
+            className="justify-self-start rounded-lg bg-slate-700 px-4 py-2 text-sm font-bold hover:bg-slate-600"
           >
             ← EXIT
           </button>
@@ -2258,12 +2186,27 @@ export default function GameScreen({
 
           </div>
 
+          {/* Robot helper = HINT button */}
           <button
             type="button"
-            onClick={restartGame}
-            className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-bold hover:bg-cyan-600"
+            onClick={showHint}
+            disabled={!!levelFeedback}
+            aria-label={`Hint (${MAX_HINTS - hintsShown} left)`}
+            className="group flex items-center gap-2 justify-self-end whitespace-nowrap rounded-xl border-2 border-yellow-400/70 bg-slate-800 py-1 pl-1 pr-3 transition hover:border-yellow-300 hover:bg-slate-700 disabled:opacity-40"
           >
-            RESTART
+            <HintRobot className="h-11 w-11 transition-transform group-hover:-translate-y-1 group-disabled:translate-y-0" />
+
+            <span className="text-left leading-tight">
+              <span className="block text-sm font-black tracking-wider text-yellow-300">
+                HINT
+              </span>
+
+              <span className="block text-[11px] font-bold text-slate-400">
+                {hintsShown < MAX_HINTS
+                  ? `${MAX_HINTS - hintsShown} left`
+                  : "show again"}
+              </span>
+            </span>
           </button>
 
         </section>

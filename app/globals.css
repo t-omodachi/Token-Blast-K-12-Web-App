@@ -248,28 +248,42 @@ body {
     );
 }
 
-/* Gemini: blue ocean world with a ring */
-.planet-gemini {
-  --glow: rgba(96, 165, 250, 0.45);
-  --glow-soft: rgba(96, 165, 250, 0.15);
+/* Google Gemma: soft light-blue world with faint patches
+   of Google's four colors, and a four-color ring */
+.planet-gemma {
+  --glow: rgba(138, 180, 248, 0.3);
+  --glow-soft: rgba(66, 133, 244, 0.12);
 }
 
-.planet-gemini .planet-body {
+.planet-gemma .planet-body {
   background-image:
-    radial-gradient(ellipse 14% 10% at 22% 30%, rgba(219, 234, 254, 0.75), transparent 70%),
-    radial-gradient(ellipse 18% 8% at 60% 68%, rgba(191, 219, 254, 0.6), transparent 70%),
-    radial-gradient(ellipse 10% 7% at 85% 40%, rgba(219, 234, 254, 0.7), transparent 70%),
-    radial-gradient(ellipse 12% 14% at 45% 45%, #22d3ee, transparent 70%),
-    linear-gradient(180deg, #1e3a8a, #2563eb 45%, #1d4ed8 70%, #172554);
+    /* first side of the planet */
+    radial-gradient(ellipse 7% 12% at 15% 35%, rgba(66, 133, 244, 0.45), transparent 70%),
+    radial-gradient(ellipse 6% 10% at 32% 68%, rgba(234, 67, 53, 0.35), transparent 70%),
+    radial-gradient(ellipse 5% 9% at 42% 30%, rgba(251, 188, 5, 0.4), transparent 70%),
+    /* other side */
+    radial-gradient(ellipse 7% 11% at 62% 32%, rgba(52, 168, 83, 0.4), transparent 70%),
+    radial-gradient(ellipse 6% 10% at 80% 66%, rgba(66, 133, 244, 0.4), transparent 70%),
+    radial-gradient(ellipse 5% 9% at 92% 30%, rgba(234, 67, 53, 0.3), transparent 70%),
+    linear-gradient(180deg, #e8f0fe, #c6dafc 55%, #8ab4f8);
 }
 
+/* Gemma's ring: Google's four colors, cut into a thin oval band */
 .planet-ring {
   width: calc(var(--planet-size) * 1.75);
   height: calc(var(--planet-size) * 0.42);
 
   border-radius: 50%;
-  border: calc(var(--planet-size) * 0.05) solid rgba(147, 197, 253, 0.6);
-  box-shadow: 0 0 0.75rem rgba(96, 165, 250, 0.5);
+
+  background: conic-gradient(
+    #4285f4 0 25%,
+    #ea4335 0 50%,
+    #fbbc05 0 75%,
+    #34a853 0
+  );
+
+  -webkit-mask: radial-gradient(closest-side, transparent 80%, #000 81% 97%, transparent 100%);
+  mask: radial-gradient(closest-side, transparent 80%, #000 81% 97%, transparent 100%);
 
   transform: translate(-50%, -50%) rotate(-16deg);
 }
@@ -283,21 +297,21 @@ body {
   clip-path: inset(50% 0 0 0);
 }
 
-/* Claude: orange rocky world with craters */
-.planet-claude {
-  --glow: rgba(251, 146, 60, 0.45);
-  --glow-soft: rgba(251, 146, 60, 0.15);
+/* Meta Llama: Facebook-blue rocky world with craters */
+.planet-llama {
+  --glow: rgba(24, 119, 242, 0.5);
+  --glow-soft: rgba(24, 119, 242, 0.18);
 }
 
-.planet-claude .planet-body {
+.planet-llama .planet-body {
   background-image:
-    radial-gradient(ellipse 6% 12% at 20% 35%, #9a3412 55%, #fdba74 65%, transparent 72%),
-    radial-gradient(ellipse 3.5% 7% at 38% 70%, #9a3412 55%, #fdba74 65%, transparent 72%),
-    radial-gradient(ellipse 4.5% 9% at 62% 25%, #9a3412 55%, #fdba74 65%, transparent 72%),
-    radial-gradient(ellipse 2.5% 5% at 75% 60%, #9a3412 55%, #fdba74 65%, transparent 72%),
-    radial-gradient(ellipse 5% 10% at 88% 78%, #9a3412 55%, #fdba74 65%, transparent 72%),
-    radial-gradient(ellipse 22% 20% at 50% 85%, rgba(124, 45, 18, 0.6), transparent 70%),
-    linear-gradient(160deg, #fb923c, #ea580c 45%, #c2410c 75%, #7c2d12);
+    radial-gradient(ellipse 6% 12% at 20% 35%, #0a3d91 55%, #8ec1ff 65%, transparent 72%),
+    radial-gradient(ellipse 3.5% 7% at 38% 70%, #0a3d91 55%, #8ec1ff 65%, transparent 72%),
+    radial-gradient(ellipse 4.5% 9% at 62% 25%, #0a3d91 55%, #8ec1ff 65%, transparent 72%),
+    radial-gradient(ellipse 2.5% 5% at 75% 60%, #0a3d91 55%, #8ec1ff 65%, transparent 72%),
+    radial-gradient(ellipse 5% 10% at 88% 78%, #0a3d91 55%, #8ec1ff 65%, transparent 72%),
+    radial-gradient(ellipse 22% 20% at 50% 85%, rgba(6, 47, 110, 0.6), transparent 70%),
+    linear-gradient(160deg, #4599ff, #1877f2 45%, #0b5fcc 75%, #062f6e);
 }
 
 /* Orbiting moon (path drawn as a faint dashed circle) */
@@ -312,7 +326,7 @@ body {
   animation: planet-orbit 16s linear infinite;
 }
 
-.planet-claude .planet-orbit {
+.planet-llama .planet-orbit {
   animation-duration: 11s;
   animation-direction: reverse;
 }

@@ -1,56 +1,34 @@
 [
-  {
-    "word": "playing",
-    "difficulty": 1
-  },
-  {
-    "word": "cats",
-    "difficulty": 1
-  },
-  {
-    "word": "jumped",
-    "difficulty": 1
-  },
-  {
-    "word": "dogs",
-    "difficulty": 1
-  },
+  { "word": "bunny", "difficulty": 1 },
+  { "word": "cried", "difficulty": 1 },
+  { "word": "crayon", "difficulty": 1 },
+  { "word": "tornado", "difficulty": 1 },
+  { "word": "unicorn", "difficulty": 1 },
+  { "word": "bicycle", "difficulty": 1 },
+  { "word": "jumping", "difficulty": 1 },
+  { "word": "playing", "difficulty": 1 },
+  { "word": "cats", "difficulty": 1 },
+  { "word": "jumped", "difficulty": 1 },
+  { "word": "fastest", "difficulty": 1 },
 
-  {
-    "word": "unhappy",
-    "difficulty": 2
-  },
-  {
-    "word": "rebuild",
-    "difficulty": 2
-  },
-  {
-    "word": "teacher",
-    "difficulty": 2
-  },
-  {
-    "word": "fastest",
-    "difficulty": 2
-  },
-  {
-    "word": "preview",
-    "difficulty": 2
-  },
-  {
-    "word": "runner",
-    "difficulty": 2
-  },
+  { "word": "raccoon", "difficulty": 2 },
+  { "word": "unlucky", "difficulty": 2 },
+  { "word": "kangaroo", "difficulty": 2 },
+  { "word": "notebook", "difficulty": 2 },
+  { "word": "hurricane", "difficulty": 2 },
+  { "word": "hamburger", "difficulty": 2 },
+  { "word": "wonderful", "difficulty": 2 },
+  { "word": "unhappy", "difficulty": 2 },
+  { "word": "teacher", "difficulty": 2 },
+  { "word": "superhero", "difficulty": 2 },
 
-  {
-    "word": "unbelievable",
-    "difficulty": 3
-  },
-  {
-    "word": "misunderstand",
-    "difficulty": 3
-  },
-  {
-    "word": "interstellar",
-    "difficulty": 3
-  }
+  { "word": "recycling", "difficulty": 3 },
+  { "word": "watermelon", "difficulty": 3 },
+  { "word": "neighborhood", "difficulty": 3 },
+  { "word": "trampoline", "difficulty": 3 },
+  { "word": "marshmallow", "difficulty": 3 },
+  { "word": "gingerbread", "difficulty": 3 },
+  { "word": "unbelievable", "difficulty": 3 },
+  { "word": "earthquake", "difficulty": 3 },
+  { "word": "extraordinary", "difficulty": 3 }
 ]

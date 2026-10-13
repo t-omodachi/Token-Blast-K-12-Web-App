@@ -8,7 +8,7 @@
  * - participant_id: random anonymous ID, remembered on this laptop
  *   until a researcher clicks "New participant". No names/initials.
  * - run: increases each time the participant starts a new
- *   play-through (PLAY, PLAY AGAIN, or RESTART).
+ *   play-through (PLAY or PLAY AGAIN).
  * - session_id: one per page load, to spot refreshes.
  *
  * Each session is stored under its own key, so logging an event only
@@ -23,30 +23,21 @@ const PARTICIPANT_KEY = "token-blast-participant";
 const LOG_PREFIX = "token-blast-research-log:";
 
 export type LogFields = {
-  screen?: string;
   model?: string;
   level?: number;
   word?: string;
   difficulty?: number;
   correct_split?: string;
-  token?: string;
   result?: string;
   duration_ms?: number;
   time_in_level_ms?: number;
-  time_left_s?: number;
-  lives_left?: number;
   score?: number;
   level_points?: number;
-  shots_fired?: number;
-  shots_hit?: number;
-  aim_accuracy?: number;
   tokens_correct?: number;
   tokens_wrong_order?: number;
   tokens_distractor?: number;
   concept_accuracy?: number;
-  crashes?: number;
-  wrong_tokens_shot?: string;
-  wrong_order_tokens?: string;
+  hints_used?: number;
   detail?: string;
 };
 
@@ -65,30 +56,21 @@ const COLUMNS: (keyof LogEvent)[] = [
   "session_id",
   "run",
   "event",
-  "screen",
   "model",
   "level",
   "word",
   "difficulty",
   "correct_split",
-  "token",
   "result",
   "duration_ms",
   "time_in_level_ms",
-  "time_left_s",
-  "lives_left",
   "score",
   "level_points",
-  "shots_fired",
-  "shots_hit",
-  "aim_accuracy",
   "tokens_correct",
   "tokens_wrong_order",
   "tokens_distractor",
   "concept_accuracy",
-  "crashes",
-  "wrong_tokens_shot",
-  "wrong_order_tokens",
+  "hints_used",
   "detail",
 ];
 
@@ -240,12 +222,25 @@ export function msSinceRunStart() {
   return runStartedAt === null ? undefined : Date.now() - runStartedAt;
 }
 
+// Fired when the participant changes, so the on-screen ID updates
+export const PARTICIPANT_CHANGE_EVENT = "token-blast-participant-change";
+
+/*
+ * Current participant ID (creates one on first use).
+ * Shown faintly on screen so students can copy it onto surveys.
+ */
+export function getParticipantId() {
+  return getParticipant().id;
+}
+
 export function newParticipant() {
   const participant = makeParticipant();
 
   runStartedAt = null;
 
   logEvent("participant_new");
+
+  window.dispatchEvent(new Event(PARTICIPANT_CHANGE_EVENT));
 
   return participant.id;
 }
@@ -338,20 +333,13 @@ const LEVEL_SUMMARY_COLUMNS = [
   "correct_split",
   "result",
   "time_in_level_ms",
-  "time_left_s",
-  "lives_left",
   "level_points",
   "score",
-  "shots_fired",
-  "shots_hit",
-  "aim_accuracy",
   "tokens_correct",
   "tokens_wrong_order",
   "tokens_distractor",
   "concept_accuracy",
-  "crashes",
-  "wrong_tokens_shot",
-  "wrong_order_tokens",
+  "hints_used",
   "feedback_read_ms",
 ] as const;
 
