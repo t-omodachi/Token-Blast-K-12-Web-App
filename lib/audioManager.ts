@@ -46,7 +46,7 @@ class AudioManager {
     this.sounds.set(
       "crawl",
       new Howl({
-        src: ["/sounds/text_crawl.wav"],
+        src: ["/sounds/text_crawl.mp3"],
         volume: 0.4,
         loop: false,
         preload: true,
@@ -57,7 +57,7 @@ class AudioManager {
     this.sounds.set(
       "battle",
       new Howl({
-        src: ["/sounds/battle_music.wav"],
+        src: ["/sounds/battle_music.mp3"],
         volume: 0.4,
         loop: true,
         preload: true,
